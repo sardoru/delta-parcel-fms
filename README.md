@@ -6,9 +6,16 @@ A parcel-first precision agriculture operations cockpit built for **Mississippi 
 
 - **Bogue Chitto Gin · Macon, MS (Noxubee County, FIPS `28103`)** — 120 official MARIS 2024 East MS Black Belt Prairie farm parcels (**28,770 surveyed acres / 25,197 cultivated acres**) centered around **Bogue Chitto Gin (`4762 Deerbrook Rd, Macon, MS 39341`)** with live haul-distance telemetry (`mi to Gin`) and Blackland soil series (**Brooksville, Okolona, Leeper, Vaiden, Kipling**).
 - **Como, MS (Panola County, FIPS `28107`)** — 120 official MARIS 2024 West MS cultivated farm parcels (**24,087 surveyed acres / 15,433 cultivated acres**) along Hwy 310, US-51, and I-55 with MLRA-134 loess soil series (**Memphis, Loring, Collins, Falaya, Grenada**).
-- **All U.S. Cotton Gins & Warehouses (`All USA (498)`)** — Every geocoded **U.S. Cotton Gin (447)** and **U.S. Cotton Warehouse (51)** across all **17 U.S. Cotton Belt states** (`TX`, `GA`, `MS`, `AR`, `NC`, `AL`, `TN`, `LA`, `MO`, `SC`, `CA`, `OK`, `AZ`, `VA`, `FL`, `KS`, `NM`) sourced from `cotton-gin-map.vercel.app`, toggleable between `USA` / `MS` scope, searchable nationwide, with USDA/2024 bale volume inspector cards and one-click **Load Surrounding MARIS Parcels** (for MS) or **Zoom to Aerial View** (nationwide).
+- **All U.S. Cotton Gins & Warehouses (`All USA (498)`)** — Every geocoded **U.S. Cotton Gin (447)** and **U.S. Cotton Warehouse (51)** across all **17 U.S. Cotton Belt states** (`TX`, `GA`, `MS`, `AR`, `NC`, `AL`, `TN`, `LA`, `MO`, `SC`, `CA`, `OK`, `AZ`, `VA`, `FL`, `KS`, `NM`) sourced from `cotton-gin-map.vercel.app`, cross-verified against Esri `PointAddress`, EPA FRS GPS/Air, and MS MARIS 2024 cadastral records (`206 ✓ Rooftop Pin`, `134 ✓ Street / POI`, `158 ~ Approx Area`).
+- **In-Cab Combine Harvester Driving & RTK AutoTrac Simulator ([Launch Cab View](https://delta-parcel-fms.vercel.app/?mode=cab))** — First-person panoramic combine cab (`X9 1100` + 40-ft `RD40F` draper/cotton header) playable directly inside any selected Mississippi MARIS parcel with Cornerpost OLED telemetry, interactive steering wheel & HydroHandle throttle, clickable CommandCenter™ G5 autopilot waypoints, Auto AB Swaths, live swath coverage painting, and Day/Dusk harvest lighting.
 
 ![DeltaPlot Bogue Chitto Gin — Macon, MS Live Satellite Parcel Dashboard](docs/preview-macon.png)
+
+### In-Cab Combine Harvester Simulator Screenshots
+
+![DeltaPlot X9 1100 Combine Harvester Cab — Daytime Cotton Harvest with Cornerpost OLED, Steering Column & CommandCenter G5 Waypoints](docs/preview-combine-cab.png)
+
+![DeltaPlot X9 1100 Combine Harvester Cab — Dusk Night Harvest with LED Work Lights & Active RTK AutoTrac Autopilot](docs/preview-combine-dusk.png)
 
 <details>
 <summary>View Como, MS (Panola County) Basin Screenshot</summary>
@@ -55,6 +62,11 @@ Out of the box, the application ships with **120 official cultivated farm parcel
 - **Live Como, MS Weather:** Fetches live temperature, wind speed & compass bearing, humidity, and sky condition for Como (`34.5101°N, -89.9401°W`) via Open-Meteo with resilient offline defaults.
 - **Parcel Dossier Drawer:** Displays official Panola County assessor records (`PARNO`, `PLSS`, `Legal Description`, `Site Address`, `2024 Assessed Land Value`, `Surveyed vs. Cultivated Acres`), USDA soil pH/CEC/drainage specs, live **Field Activity Logger**, and one-click **JSON Parcel Export**.
 
+### 5. In-Cab Combine Harvester Driving & RTK AutoTrac Simulator
+- **First-Person Panoramic Windshield:** 60fps perspective view over the real selected MARIS parcel polygon with converging crop rows (white cotton bolls, corn stalks, soybeans, sorghum, or wheat), live harvested stubble swaths, animated 40-ft `RD40F` draper header with spinning pickup reel & hydraulic raise/lower (`4"–44"`), chaff/dust plumes, Day/Dusk mode with LED work-light beams, windshield wiper, and AR windshield guidance corridor.
+- **Right A-Pillar Cornerpost OLED Display:** Live ground speed (`MPH`), drive range (`F1 / F2 / N / R`), engine RPM & load %, coolant °F, live grain tank / cotton basket fill %, header height gauge, shoe & rotor loss monitor, fuel/DEF %, and `SEP / HDR / AUTO / AUG` annunciators.
+- **Interactive Steering, HydroHandle & CommandCenter™ G5 Waypoints:** Drag the 3-spoke steering wheel or drive with `W/A/S/D` & Arrow keys, drop custom waypoints by clicking anywhere on the live parcel map, generate parallel **Auto AB Swaths**, engage **RTK AutoTrac (`P`)** pure-pursuit autopilot with live Cross-Track Error (`XTE`), inspect **Threshing** diagnostics (Dual Rotor RPM, Cleaning Fan RPM, Concave Clearance), and log harvested acreage directly back to the parcel dossier upon exiting.
+
 ---
 
 ## Tech Stack
@@ -77,24 +89,34 @@ Out of the box, the application ships with **120 official cultivated farm parcel
 ```text
 delta-parcel-fms/
 ├── docs/
+│   ├── preview-macon.png            # Live Bogue Chitto Gin — Macon, MS dashboard screenshot
+│   ├── preview-combine-cab.png      # In-cab Combine Harvester interior (Daytime Harvest)
+│   ├── preview-combine-dusk.png     # In-cab Combine Harvester interior (Dusk Auto-Harvest)
 │   └── preview.png                  # Live Como, MS dashboard screenshot
 ├── public/
 │   ├── assets/
 │   │   └── farmer-avatar.jpg        # Operator profile portrait
 │   └── data/
-│       └── como-ms-parcels.geojson  # 120 official 2024 MARIS Como, MS cultivated parcels (142 KB)
+│       ├── bogue-chitto-macon-parcels.geojson
+│       ├── como-ms-parcels.geojson
+│       ├── ms-cotton-facilities.json
+│       └── us-cotton-facilities.json
 ├── src/
 │   ├── components/
 │   │   ├── BottomTelemetryDock.tsx  # Fleet wireframes, irrigation offset tuner, live yield spectrum
-│   │   ├── InspectorDrawers.tsx     # Panola cadastral dossier, AI agronomy drawer, equipment dispatch
+│   │   ├── CombineCabSimulator.tsx  # In-cab Cornerpost OLED, steering wheel, HydroHandle & CommandCenter G5
+│   │   ├── CombineWindshieldCanvas.tsx # 60fps panoramic perspective field, 40-ft header & AR HUD renderer
+│   │   ├── InspectorDrawers.tsx     # Cadastral dossier, AI agronomy drawer, equipment dispatch
 │   │   ├── LeftAnalyticsRail.tsx    # Segmented health gauge, trend chart, 16x6 stress heatmap
 │   │   ├── ParcelMapStage.tsx       # MapLibre GL 3D satellite stage, MARIS sync, geodesic plotter
-│   │   └── TopHudBar.tsx            # Live weather pills, parcel/PARNO search, unit toggle, alerts
+│   │   └── TopHudBar.tsx            # Live weather pills, parcel/facility search, Drive Combine button
 │   ├── data/
-│   │   └── comoParcels.ts           # MARIS feature hydration, Panola MLRA-134 soils, fleet & alerts
+│   │   ├── msParcels.ts             # MARIS feature hydration, regional soils, fleet & alerts
+│   │   └── regions.ts               # Macon (Noxubee) & Como (Panola) region definitions
 │   ├── types/
-│   │   └── farm.ts                  # TypeScript domain models (Parcel, Equipment, StressCell, etc.)
+│   │   └── farm.ts                  # TypeScript domain models (Parcel, Equipment, CottonFacility, etc.)
 │   ├── utils/
+│   │   ├── combineSim.ts            # Combine vehicle physics, HarvestGrid & RTK Pure-Pursuit autopilot
 │   │   └── units.ts                 # Geodesic area (spherical excess), bbox, AC/HA & °F/°C formatters
 │   ├── App.tsx                      # State orchestration, MARIS live fetch, Open-Meteo weather
 │   ├── index.css                    # Smoked obsidian glass tokens, fonts, animations
