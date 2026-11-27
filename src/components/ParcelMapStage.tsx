@@ -41,8 +41,10 @@ interface ParcelMapStageProps {
   selectedParcel: Parcel;
   selectedFacility: CottonFacility | null;
   statewideTick: number;
+  nationwideTick: number;
   activeLayer: MapLayer;
   showFacilities: boolean;
+  facilityScope: 'usa' | 'ms';
   unit: AreaUnit;
   hoveredStressCell: StressCell | null;
   isDrawingPlot: boolean;
@@ -52,6 +54,7 @@ interface ParcelMapStageProps {
   onSelectFacility: (facility: CottonFacility | null) => void;
   onChangeLayer: (layer: MapLayer) => void;
   onToggleFacilities: () => void;
+  onToggleFacilityScope: () => void;
   onOpenParcelDetail: () => void;
   onSyncMarisBounds: (
     bounds: { west: number; south: number; east: number; north: number },
@@ -85,8 +88,10 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   selectedParcel,
   selectedFacility,
   statewideTick,
+  nationwideTick,
   activeLayer,
   showFacilities,
+  facilityScope,
   unit,
   hoveredStressCell,
   isDrawingPlot,
@@ -96,6 +101,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   onSelectFacility,
   onChangeLayer,
   onToggleFacilities,
+  onToggleFacilityScope,
   onOpenParcelDetail,
   onSyncMarisBounds,
   onFinishDrawPlot,
@@ -214,11 +220,16 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   const parcelsGeoJsonRef = useRef(parcelsGeoJson);
   parcelsGeoJsonRef.current = parcelsGeoJson;
 
-  // Build MapLibre GeoJSON FeatureCollection for all 40 Mississippi Cotton Gins & Warehouses
+  // Build MapLibre GeoJSON FeatureCollection for all visible US Cotton Gins & Warehouses
+  const visibleFacilities = useMemo(
+    () => (facilityScope === 'ms' ? facilities.filter((f) => f.state === 'MS') : facilities),
+    [facilities, facilityScope]
+  );
+
   const facilitiesGeoJson = useMemo(
     () => ({
       type: 'FeatureCollection' as const,
-      features: facilities.map((f, idx) => ({
+      features: visibleFacilities.map((f, idx) => ({
         type: 'Feature' as const,
         id: idx + 1,
         properties: {
@@ -227,6 +238,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
           name: f.name,
           city: f.city,
           county: f.county,
+          state: f.state,
           bales: f.kind === 'gin' ? f.estBales2024 || 20000 : f.capacityBales || 80000,
           isSelected: selectedFacility?.id === f.id ? 1 : 0,
         },
@@ -236,7 +248,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
         },
       })),
     }),
-    [facilities, selectedFacility?.id]
+    [visibleFacilities, selectedFacility?.id]
   );
 
   const facilitiesGeoJsonRef = useRef(facilitiesGeoJson);
@@ -397,7 +409,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
               'line-width': 3.2,
             },
           },
-          // All 38 Mississippi Cotton Gins (amber-gold) & 2 Mississippi Cotton Warehouses (sky-cyan)
+          // All U.S. Cotton Gins (amber-gold) & Cotton Warehouses (sky-cyan)
           {
             id: 'ms-facilities-halo',
             type: 'circle',
@@ -407,8 +419,10 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
                 'interpolate',
                 ['linear'],
                 ['zoom'],
+                3.5,
+                ['case', ['==', ['get', 'kind'], 'warehouse'], 9, 6.5],
                 6,
-                ['case', ['==', ['get', 'kind'], 'warehouse'], 14, 11],
+                ['case', ['==', ['get', 'kind'], 'warehouse'], 13, 10],
                 12,
                 ['case', ['==', ['get', 'kind'], 'warehouse'], 20, 16],
               ],
@@ -422,8 +436,8 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
               'circle-opacity': [
                 'case',
                 ['==', ['get', 'isSelected'], 1],
-                0.78,
-                0.38,
+                0.82,
+                0.34,
               ],
             },
           },
@@ -436,8 +450,10 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
                 'interpolate',
                 ['linear'],
                 ['zoom'],
+                3.5,
+                ['case', ['==', ['get', 'kind'], 'warehouse'], 5.2, 3.6],
                 6,
-                ['case', ['==', ['get', 'kind'], 'warehouse'], 7.5, 5.5],
+                ['case', ['==', ['get', 'kind'], 'warehouse'], 7.2, 5.2],
                 12,
                 ['case', ['==', ['get', 'kind'], 'warehouse'], 10, 7.5],
               ],
@@ -456,8 +472,8 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
               'circle-stroke-width': [
                 'case',
                 ['==', ['get', 'isSelected'], 1],
-                3,
-                1.8,
+                2.8,
+                1.3,
               ],
             },
           },
@@ -467,10 +483,13 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
             source: 'ms-facilities',
             paint: {
               'circle-radius': [
-                'case',
-                ['==', ['get', 'kind'], 'warehouse'],
-                3.2,
-                2.2,
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                3.5,
+                ['case', ['==', ['get', 'kind'], 'warehouse'], 1.8, 1.1],
+                10,
+                ['case', ['==', ['get', 'kind'], 'warehouse'], 3.2, 2.2],
               ],
               'circle-color': '#141710',
             },
@@ -553,7 +572,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
         const balesNum = Number(props.bales || 0);
         setHoveredParcelInfo({
           name: String(props.name || ''),
-          subline: `${isWh ? 'Cotton Warehouse' : 'Cotton Gin'} · ${props.city || props.county}, MS · ${balesNum.toLocaleString()} ${isWh ? 'bale cap' : 'est. bales'}`,
+          subline: `${isWh ? 'Cotton Warehouse' : 'Cotton Gin'} · ${props.city || props.county}, ${props.state || 'US'} · ${balesNum.toLocaleString()} ${isWh ? 'bale cap' : 'est. bales'}`,
           accent: isWh ? '#5ec8eb' : '#f0bb66',
           x: e.point.x,
           y: e.point.y,
@@ -678,7 +697,31 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
     });
   }, [selectedFacility, is3D]);
 
-  // Fly out to full Mississippi State view showing all 38 Cotton Gins & 2 Warehouses
+  // Fly out to full USA Cotton Belt view showing all 498 U.S. Cotton Gins & Warehouses
+  const prevNationwideTick = useRef(nationwideTick);
+  useEffect(() => {
+    if (nationwideTick === prevNationwideTick.current) return;
+    prevNationwideTick.current = nationwideTick;
+    const map = mapRef.current;
+    if (!map || !mapReadyRef.current) return;
+    const isDesktop = window.innerWidth >= 1024;
+    map.fitBounds(
+      [
+        [-121.2, 25.6],
+        [-75.2, 38.6],
+      ],
+      {
+        pitch: is3D ? 18 : 0,
+        bearing: 0,
+        padding: isDesktop
+          ? { left: 375, right: 155, top: 105, bottom: 268 }
+          : { left: 16, right: 16, top: 100, bottom: 200 },
+        duration: 1200,
+      }
+    );
+  }, [nationwideTick, is3D]);
+
+  // Fly out to full Mississippi State view showing all 40 MS Cotton Gins & Warehouses
   const prevStatewideTick = useRef(statewideTick);
   useEffect(() => {
     if (statewideTick === prevStatewideTick.current) return;
@@ -913,7 +956,8 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
                           : 'bg-[#f0bb66]/16 text-[#f0bb66]'
                       }`}
                     >
-                      {selectedFacility.kind === 'warehouse' ? 'MS Cotton Warehouse' : 'MS Cotton Gin'}
+                      {selectedFacility.state}{' '}
+                      {selectedFacility.kind === 'warehouse' ? 'Cotton Warehouse' : 'Cotton Gin'}
                     </span>
                     {selectedFacility.iceLicensed && (
                       <span className="rounded-full bg-[#d8f274]/15 px-1.5 py-0.5 font-mono text-[9px] text-[#d8f274]">
@@ -990,40 +1034,64 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
             </div>
 
             <div className="mt-3 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const map = mapRef.current;
-                  const isDesktop = window.innerWidth >= 1024;
-                  const layerId: 1 | 2 = selectedFacility.lng < -89.65 ? 1 : 2;
-                  const dLng = 0.045;
-                  const dLat = 0.032;
-                  map?.flyTo({
-                    center: [selectedFacility.lng, selectedFacility.lat],
-                    zoom: 13.0,
-                    pitch: is3D ? 48 : 0,
-                    bearing: is3D ? -14 : 0,
-                    padding: isDesktop
-                      ? { left: 365, right: 110, top: 96, bottom: 265 }
-                      : { left: 16, right: 16, top: 90, bottom: 180 },
-                    duration: 900,
-                  });
-                  onSyncMarisBounds(
-                    {
-                      west: Number((selectedFacility.lng - dLng).toFixed(4)),
-                      south: Number((selectedFacility.lat - dLat).toFixed(4)),
-                      east: Number((selectedFacility.lng + dLng).toFixed(4)),
-                      north: Number((selectedFacility.lat + dLat).toFixed(4)),
-                    },
-                    layerId
-                  );
-                }}
-                disabled={isSyncingMaris}
-                className="flex items-center gap-1.5 rounded-full bg-[#d8f274] px-3.5 py-1.5 text-[11.5px] font-semibold text-[#141710] transition-opacity hover:bg-[#e5fa93] disabled:opacity-50"
-              >
-                <MapPinArea size={14} weight="bold" />
-                <span>{isSyncingMaris ? 'Loading Parcels...' : 'Load Surrounding MARIS Parcels'}</span>
-              </button>
+              {selectedFacility.state === 'MS' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const map = mapRef.current;
+                    const isDesktop = window.innerWidth >= 1024;
+                    const layerId: 1 | 2 = selectedFacility.lng < -89.65 ? 1 : 2;
+                    const dLng = 0.045;
+                    const dLat = 0.032;
+                    map?.flyTo({
+                      center: [selectedFacility.lng, selectedFacility.lat],
+                      zoom: 13.0,
+                      pitch: is3D ? 48 : 0,
+                      bearing: is3D ? -14 : 0,
+                      padding: isDesktop
+                        ? { left: 365, right: 110, top: 96, bottom: 265 }
+                        : { left: 16, right: 16, top: 90, bottom: 180 },
+                      duration: 900,
+                    });
+                    onSyncMarisBounds(
+                      {
+                        west: Number((selectedFacility.lng - dLng).toFixed(4)),
+                        south: Number((selectedFacility.lat - dLat).toFixed(4)),
+                        east: Number((selectedFacility.lng + dLng).toFixed(4)),
+                        north: Number((selectedFacility.lat + dLat).toFixed(4)),
+                      },
+                      layerId
+                    );
+                  }}
+                  disabled={isSyncingMaris}
+                  className="flex items-center gap-1.5 rounded-full bg-[#d8f274] px-3.5 py-1.5 text-[11.5px] font-semibold text-[#141710] transition-opacity hover:bg-[#e5fa93] disabled:opacity-50"
+                >
+                  <MapPinArea size={14} weight="bold" />
+                  <span>{isSyncingMaris ? 'Loading Parcels...' : 'Load Surrounding MARIS Parcels'}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const map = mapRef.current;
+                    const isDesktop = window.innerWidth >= 1024;
+                    map?.flyTo({
+                      center: [selectedFacility.lng, selectedFacility.lat],
+                      zoom: 14.5,
+                      pitch: is3D ? 48 : 0,
+                      bearing: is3D ? -12 : 0,
+                      padding: isDesktop
+                        ? { left: 365, right: 110, top: 96, bottom: 265 }
+                        : { left: 16, right: 16, top: 90, bottom: 180 },
+                      duration: 950,
+                    });
+                  }}
+                  className="flex items-center gap-1.5 rounded-full bg-[#d8f274] px-3.5 py-1.5 text-[11.5px] font-semibold text-[#141710] transition-opacity hover:bg-[#e5fa93]"
+                >
+                  <MapPinArea size={14} weight="bold" />
+                  <span>Zoom to Aerial View</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1151,11 +1219,11 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
           );
         })}
 
-        {/* Mississippi Cotton Gins & Warehouses Layer Toggle */}
+        {/* U.S. Cotton Gins & Warehouses Layer Toggle + USA/MS Scope */}
         <button
           type="button"
           onClick={onToggleFacilities}
-          title="Toggle all 38 Mississippi Cotton Gins (amber) and 2 Cotton Warehouses (cyan)"
+          title="Toggle U.S. Cotton Gins (amber) and Cotton Warehouses (cyan)"
           className={`glass-pill mt-0.5 flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium transition-all ${
             showFacilities
               ? 'border-[#f0bb66]/55 bg-[#201e17]/92 text-[#f6deb2]'
@@ -1166,8 +1234,25 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
             <span className="h-2 w-2 rounded-full bg-[#f0bb66]" />
             <span className="h-2 w-2 rounded-full bg-[#5ec8eb]" />
           </span>
-          <span>Gins &amp; WH ({facilities.length})</span>
+          <span>Gins &amp; WH ({visibleFacilities.length})</span>
         </button>
+
+        {showFacilities && (
+          <button
+            type="button"
+            onClick={onToggleFacilityScope}
+            title="Switch between all 17 Cotton Belt U.S. states and Mississippi only"
+            className="glass-pill flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px] text-[#dce2d4]/80 hover:border-white/25"
+          >
+            <span className={facilityScope === 'usa' ? 'text-[#f0bb66] font-semibold' : 'text-[#dce2d4]/45'}>
+              USA
+            </span>
+            <span className="text-white/25">/</span>
+            <span className={facilityScope === 'ms' ? 'text-[#d8f274] font-semibold' : 'text-[#dce2d4]/45'}>
+              MS
+            </span>
+          </button>
+        )}
 
         {/* Live MARIS Statewide GIS Pull Button */}
         <button

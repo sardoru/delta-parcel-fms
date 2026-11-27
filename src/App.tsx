@@ -66,8 +66,10 @@ export function App() {
   const [facilities, setFacilities] = useState<CottonFacility[]>([]);
   const [selectedFacility, setSelectedFacility] = useState<CottonFacility | null>(null);
   const [showFacilities, setShowFacilities] = useState(true);
-  const [isStatewideView, setIsStatewideView] = useState(false);
+  const [facilityScope, setFacilityScope] = useState<'usa' | 'ms'>('usa');
+  const [viewMode, setViewMode] = useState<'region' | 'ms' | 'usa'>('region');
   const [statewideTick, setStatewideTick] = useState(0);
+  const [nationwideTick, setNationwideTick] = useState(0);
   const [loadingParcels, setLoadingParcels] = useState(true);
   const [equipmentByRegion, setEquipmentByRegion] =
     useState<Record<RegionId, EquipmentUnit[]>>(REGION_EQUIPMENT);
@@ -87,9 +89,9 @@ export function App() {
   const cacheRef = useRef(regionCache);
   cacheRef.current = regionCache;
 
-  // Load all 38 Mississippi Cotton Gins & 2 Mississippi Cotton Warehouses (from cotton-gin-map.vercel.app)
+  // Load all 498 U.S. Cotton Gins (447) & Cotton Warehouses (51) across all 17 Cotton Belt states
   useEffect(() => {
-    fetch('/data/ms-cotton-facilities.json')
+    fetch('/data/us-cotton-facilities.json')
       .then((r) => r.json())
       .then((d: { all?: CottonFacility[] }) => {
         if (Array.isArray(d?.all)) setFacilities(d.all);
@@ -402,7 +404,7 @@ export function App() {
 
   return (
     <div className="relative min-h-[100dvh] w-full overflow-x-hidden bg-[#10130f]">
-      {/* Real 3D-Tilted MapLibre Satellite Stage with Official MARIS 2024 Parcels + 40 MS Gins/Warehouses */}
+      {/* Real 3D-Tilted MapLibre Satellite Stage with Official MARIS 2024 Parcels + All 498 US Gins/Warehouses */}
       <ParcelMapStage
         region={region}
         parcels={parcels}
@@ -410,24 +412,30 @@ export function App() {
         selectedParcel={selectedParcel}
         selectedFacility={selectedFacility}
         statewideTick={statewideTick}
+        nationwideTick={nationwideTick}
         activeLayer={activeLayer}
         showFacilities={showFacilities}
+        facilityScope={facilityScope}
         unit={unit}
         hoveredStressCell={hoveredStressCell}
         isDrawingPlot={isDrawingPlot}
         isSyncingMaris={isSyncingMaris}
         marisSyncMessage={marisSyncMessage}
         onSelectParcel={(id) => {
-          setIsStatewideView(false);
+          setViewMode('region');
           setSelectedParcelId(id);
           setHoveredStressCell(null);
         }}
         onSelectFacility={(fac) => {
           setSelectedFacility(fac);
-          if (fac) setShowFacilities(true);
+          if (fac) {
+            setShowFacilities(true);
+            if (fac.state !== 'MS') setFacilityScope('usa');
+          }
         }}
         onChangeLayer={setActiveLayer}
         onToggleFacilities={() => setShowFacilities((v) => !v)}
+        onToggleFacilityScope={() => setFacilityScope((s) => (s === 'usa' ? 'ms' : 'usa'))}
         onOpenParcelDetail={() => setParcelDetailOpen(true)}
         onSyncMarisBounds={handleSyncMarisBounds}
         onFinishDrawPlot={handleFinishDrawPlot}
@@ -453,17 +461,24 @@ export function App() {
         <div className="order-1 flex w-full min-w-0 max-w-full flex-1 flex-col justify-between gap-3 lg:order-2">
           <TopHudBar
             region={region}
-            isStatewideView={isStatewideView}
+            viewMode={viewMode}
             onChangeRegion={(rid) => {
-              setIsStatewideView(false);
+              setViewMode('region');
               setSelectedFacility(null);
               setRegionId(rid);
             }}
             onViewAllMS={() => {
               setShowFacilities(true);
               setSelectedFacility(null);
-              setIsStatewideView(true);
+              setViewMode('ms');
               setStatewideTick((t) => t + 1);
+            }}
+            onViewAllUSA={() => {
+              setShowFacilities(true);
+              setFacilityScope('usa');
+              setSelectedFacility(null);
+              setViewMode('usa');
+              setNationwideTick((t) => t + 1);
             }}
             parcels={parcels}
             facilities={facilities}
@@ -474,13 +489,14 @@ export function App() {
             unit={unit}
             onToggleUnit={() => setUnit((u) => (u === 'ac' ? 'ha' : 'ac'))}
             onSelectParcel={(id) => {
-              setIsStatewideView(false);
+              setViewMode('region');
               setSelectedFacility(null);
               setSelectedParcelId(id);
               setHoveredStressCell(null);
             }}
             onSelectFacility={(fac) => {
               setShowFacilities(true);
+              if (fac.state !== 'MS') setFacilityScope('usa');
               setSelectedFacility(fac);
             }}
             onSelectEquipment={(eqId) => setInspectedEquipmentId(eqId)}

@@ -6,7 +6,7 @@ A parcel-first precision agriculture operations cockpit built for **Mississippi 
 
 - **Bogue Chitto Gin · Macon, MS (Noxubee County, FIPS `28103`)** — 120 official MARIS 2024 East MS Black Belt Prairie farm parcels (**28,770 surveyed acres / 25,197 cultivated acres**) centered around **Bogue Chitto Gin (`4762 Deerbrook Rd, Macon, MS 39341`)** with live haul-distance telemetry (`mi to Gin`) and Blackland soil series (**Brooksville, Okolona, Leeper, Vaiden, Kipling**).
 - **Como, MS (Panola County, FIPS `28107`)** — 120 official MARIS 2024 West MS cultivated farm parcels (**24,087 surveyed acres / 15,433 cultivated acres**) along Hwy 310, US-51, and I-55 with MLRA-134 loess soil series (**Memphis, Loring, Collins, Falaya, Grenada**).
-- **All Mississippi Cotton Gins & Warehouses (`All MS Gins (40)`)** — Every active **Mississippi Cotton Gin (38)** and **Mississippi Cotton Warehouse (2 — Olive Branch / DeSoto & Greenville / Washington)** sourced from `cotton-gin-map.vercel.app`, mapped statewide with interactive USDA/2024 bale volume inspector cards and one-click **Load Surrounding MARIS Parcels**.
+- **All U.S. Cotton Gins & Warehouses (`All USA (498)`)** — Every geocoded **U.S. Cotton Gin (447)** and **U.S. Cotton Warehouse (51)** across all **17 U.S. Cotton Belt states** (`TX`, `GA`, `MS`, `AR`, `NC`, `AL`, `TN`, `LA`, `MO`, `SC`, `CA`, `OK`, `AZ`, `VA`, `FL`, `KS`, `NM`) sourced from `cotton-gin-map.vercel.app`, toggleable between `USA` / `MS` scope, searchable nationwide, with USDA/2024 bale volume inspector cards and one-click **Load Surrounding MARIS Parcels** (for MS) or **Zoom to Aerial View** (nationwide).
 
 ![DeltaPlot Bogue Chitto Gin — Macon, MS Live Satellite Parcel Dashboard](docs/preview-macon.png)
 

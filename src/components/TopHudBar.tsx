@@ -31,9 +31,10 @@ import { formatArea, formatTemp, formatWind } from '../utils/units';
 
 interface TopHudBarProps {
   region: RegionConfig;
-  isStatewideView: boolean;
+  viewMode: 'region' | 'ms' | 'usa';
   onChangeRegion: (id: RegionId) => void;
   onViewAllMS: () => void;
+  onViewAllUSA: () => void;
   parcels: Parcel[];
   facilities: CottonFacility[];
   equipment: EquipmentUnit[];
@@ -51,9 +52,10 @@ interface TopHudBarProps {
 
 export const TopHudBar: React.FC<TopHudBarProps> = ({
   region,
-  isStatewideView,
+  viewMode,
   onChangeRegion,
   onViewAllMS,
+  onViewAllUSA,
   parcels,
   facilities,
   equipment,
@@ -120,10 +122,12 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
             f.name.toLowerCase().includes(q) ||
             f.city.toLowerCase().includes(q) ||
             f.county.toLowerCase().includes(q) ||
+            f.state.toLowerCase() === q ||
             f.address.toLowerCase().includes(q) ||
+            f.code.toLowerCase().includes(q) ||
             f.kind.includes(q)
         )
-        .slice(0, 8),
+        .slice(0, 12),
       equipment: equipment.filter(
         (eq) =>
           eq.name.toLowerCase().includes(q) ||
@@ -142,14 +146,14 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
             {region.title}
           </h1>
 
-          {/* Mississippi Basin Switcher (Macon / Bogue Chitto Gin ↔ Como / Panola ↔ All MS Gins) */}
+          {/* Basin & Cotton Belt Switcher */}
           <div
             role="tablist"
-            aria-label="Switch Mississippi farm basin"
+            aria-label="Switch farm basin or nationwide cotton map"
             className="glass-pill inline-flex shrink-0 items-center rounded-full p-0.5 text-[11px]"
           >
             {(['macon', 'como'] as RegionId[]).map((rid) => {
-              const active = !isStatewideView && region.id === rid;
+              const active = viewMode === 'region' && region.id === rid;
               return (
                 <button
                   key={rid}
@@ -170,15 +174,28 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
             <button
               type="button"
               role="tab"
-              aria-selected={isStatewideView}
+              aria-selected={viewMode === 'ms'}
               onClick={onViewAllMS}
               className={`rounded-full px-2.5 py-1 font-medium transition-all ${
-                isStatewideView
+                viewMode === 'ms'
                   ? 'bg-[#f0bb66] text-[#141710] shadow-sm'
                   : 'text-[#f0bb66]/85 hover:text-[#f6deb2]'
               }`}
             >
-              All MS Gins ({facilities.length})
+              MS
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'usa'}
+              onClick={onViewAllUSA}
+              className={`rounded-full px-2.5 py-1 font-medium transition-all ${
+                viewMode === 'usa'
+                  ? 'bg-[#5ec8eb] text-[#111518] shadow-sm'
+                  : 'text-[#7fd5f2]/85 hover:text-[#b8ebfc]'
+              }`}
+            >
+              All USA ({facilities.length})
             </button>
           </div>
         </div>
@@ -294,7 +311,7 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
               {searchResults.facilities.length > 0 && (
                 <>
                   <div className="mt-1.5 border-t border-white/8 px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-[#f0bb66]/75">
-                    MS Cotton Gins &amp; Warehouses ({searchResults.facilities.length})
+                    US Cotton Gins &amp; Warehouses ({searchResults.facilities.length})
                   </div>
                   <div className="max-h-[190px] overflow-y-auto">
                     {searchResults.facilities.map((fac) => (
@@ -319,7 +336,7 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
                               {fac.name}
                             </div>
                             <div className="truncate text-[10px] text-[#dce2d4]/55">
-                              {fac.city || fac.county}, MS ·{' '}
+                              {fac.city || fac.county}, {fac.state} ·{' '}
                               {fac.kind === 'warehouse' ? 'Warehouse' : 'Cotton Gin'}
                             </div>
                           </div>
@@ -329,7 +346,7 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
                             ? `${Math.round(fac.capacityBales / 1000)}k cap`
                             : fac.estBales2024
                             ? `${Math.round(fac.estBales2024 / 1000)}k`
-                            : 'MS'}
+                            : fac.state}
                         </span>
                       </button>
                     ))}

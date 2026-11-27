@@ -187,7 +187,7 @@ export interface CottonFacility {
   address: string;
   city: string;
   county: string;
-  state: 'MS';
+  state: string;
   zip: string;
   lat: number;
   lng: number;
