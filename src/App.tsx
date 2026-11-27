@@ -34,6 +34,7 @@ import {
   EquipmentDrawer,
   ParcelDetailDrawer,
 } from './components/InspectorDrawers';
+import { CombineCabSimulator } from './components/CombineCabSimulator';
 
 const CUSTOM_PLOTS_PREFIX = 'deltaplot_ms_custom_v2_';
 
@@ -85,6 +86,13 @@ export function App() {
   const [parcelDetailOpen, setParcelDetailOpen] = useState(false);
   const [aiInsightsOpen, setAiInsightsOpen] = useState(false);
   const [inspectedEquipmentId, setInspectedEquipmentId] = useState<string | null>(null);
+  const [cabModeOpen, setCabModeOpen] = useState<boolean>(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('mode') === 'cab';
+    } catch {
+      return false;
+    }
+  });
 
   const cacheRef = useRef(regionCache);
   cacheRef.current = regionCache;
@@ -502,6 +510,10 @@ export function App() {
             onSelectEquipment={(eqId) => setInspectedEquipmentId(eqId)}
             isDrawingPlot={isDrawingPlot}
             onToggleDrawPlot={() => setIsDrawingPlot((v) => !v)}
+            onOpenCabMode={() => {
+              setIsDrawingPlot(false);
+              setCabModeOpen(true);
+            }}
           />
 
           {/* Compact Parcel Switcher Strip on small screens */}
@@ -575,6 +587,26 @@ export function App() {
           unit={unit}
           onClose={() => setInspectedEquipmentId(null)}
           onReassignParcel={handleReassignEquipment}
+        />
+      )}
+
+      {/* First-Person In-Cab Combine Harvester Driving & RTK AutoTrac Simulator */}
+      {cabModeOpen && selectedParcel && (
+        <CombineCabSimulator
+          parcel={selectedParcel}
+          weather={weather}
+          onExit={(harvestedAcres, harvestedUnits, unitLabel) => {
+            setCabModeOpen(false);
+            if (harvestedAcres >= 0.05) {
+              handleAddLog(selectedParcel.id, {
+                date: 'Live Cab Run',
+                category: 'Harvest',
+                title: `Combine X9 1100 Harvested ${harvestedAcres.toFixed(2)} ac`,
+                operator: 'In-Cab Operator (RTK AutoTrac)',
+                detail: `Harvested ${harvestedAcres.toFixed(2)} ac of ${selectedParcel.crop} (~${harvestedUnits.toLocaleString()} ${unitLabel}) via 40-ft RD40F header.`,
+              });
+            }
+          }}
         />
       )}
     </div>

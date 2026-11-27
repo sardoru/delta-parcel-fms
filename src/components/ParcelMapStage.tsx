@@ -976,10 +976,10 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
                         }`}
                       >
                         {selectedFacility.coordPrecision === 'rooftop'
-                          ? '✓ Exact Pin'
+                          ? '✓ Rooftop Pin'
                           : selectedFacility.coordPrecision === 'facility'
-                          ? '✓ Facility POI'
-                          : '~ ZIP Area'}
+                          ? '✓ Street / POI'
+                          : '~ Approx Area'}
                       </span>
                     )}
                   </div>

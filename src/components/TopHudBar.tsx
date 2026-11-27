@@ -48,6 +48,7 @@ interface TopHudBarProps {
   onSelectEquipment: (eqId: string) => void;
   isDrawingPlot: boolean;
   onToggleDrawPlot: () => void;
+  onOpenCabMode: () => void;
 }
 
 export const TopHudBar: React.FC<TopHudBarProps> = ({
@@ -69,6 +70,7 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
   onSelectEquipment,
   isDrawingPlot,
   onToggleDrawPlot,
+  onOpenCabMode,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -385,6 +387,17 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
             </div>
           )}
         </div>
+
+        {/* Drive Combine Harvester Cab Simulator Trigger */}
+        <button
+          type="button"
+          onClick={onOpenCabMode}
+          title="Drive Combine Harvester from inside the cab on the active parcel"
+          className="flex h-10 items-center gap-1.5 rounded-full border border-[#d8f274]/55 bg-[#d8f274] px-3.5 text-[12px] font-bold text-[#141710] shadow-[0_8px_24px_-6px_rgba(216,242,116,0.55)] transition-all hover:bg-[#e7fc95] active:scale-[0.98]"
+        >
+          <Tractor size={15} weight="fill" />
+          <span className="hidden sm:inline">Drive Combine</span>
+        </button>
 
         {/* Add Parcel Plot Trigger */}
         <button
