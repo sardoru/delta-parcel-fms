@@ -44,6 +44,7 @@ interface ParcelMapStageProps {
   statewideTick: number;
   nationwideTick: number;
   activeLayer: MapLayer;
+  showTopoOverlay: boolean;
   showUsgsWaterOverlay: boolean;
   showLidarOverlay: boolean;
   lidarOverlayStyle: 'elevation' | 'slope' | 'contours';
@@ -57,6 +58,7 @@ interface ParcelMapStageProps {
   onSelectParcel: (parcelId: string, multiSelect?: boolean) => void;
   onSelectFacility: (facility: CottonFacility | null) => void;
   onChangeLayer: (layer: MapLayer) => void;
+  onToggleTopoOverlay: () => void;
   onToggleUsgsWaterOverlay: () => void;
   onToggleLidarOverlay: () => void;
   onChangeLidarOverlayStyle: (style: 'elevation' | 'slope' | 'contours') => void;
@@ -106,6 +108,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   statewideTick,
   nationwideTick,
   activeLayer,
+  showTopoOverlay,
   showUsgsWaterOverlay,
   showLidarOverlay,
   lidarOverlayStyle,
@@ -119,6 +122,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   onSelectParcel,
   onSelectFacility,
   onChangeLayer,
+  onToggleTopoOverlay,
   onToggleUsgsWaterOverlay,
   onToggleLidarOverlay,
   onChangeLidarOverlayStyle,
@@ -152,6 +156,8 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   onSelectParcelRef.current = onSelectParcel;
   const onSelectFacilityRef = useRef(onSelectFacility);
   onSelectFacilityRef.current = onSelectFacility;
+  const showTopoRef = useRef(showTopoOverlay);
+  showTopoRef.current = showTopoOverlay;
   const showUsgsWaterRef = useRef(showUsgsWaterOverlay);
   showUsgsWaterRef.current = showUsgsWaterOverlay;
   const showLidarRef = useRef(showLidarOverlay);
@@ -357,6 +363,16 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
             tileSize: 256,
             maxzoom: 18,
           },
+          // Live USGS The National Map US Topo (contours, terrain shading, hydrography & benchmarks)
+          'usgs-topo': {
+            type: 'raster',
+            tiles: [
+              'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}',
+            ],
+            tileSize: 256,
+            maxzoom: 16,
+            attribution: 'USGS The National Map · US Topo',
+          },
           // Live USGS 3DEP 1m LiDAR Heatmaps (Elevation Tinted Hillshade, Slope Runoff Map, 2ft Contours)
           'usgs-lidar-elevation': {
             type: 'raster',
@@ -430,6 +446,14 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
               'raster-contrast': 0.14,
               'raster-saturation': 0.12,
             },
+          },
+          // USGS US Topo Topographical Map Overlay (lazy-loaded only when toggled ON)
+          {
+            id: 'overlay-usgs-topo',
+            type: 'raster',
+            source: 'usgs-topo',
+            layout: { visibility: 'none' },
+            paint: { 'raster-opacity': 0.80, 'raster-contrast': 0.08 },
           },
           // USGS 3DEP / NASA LiDAR Heatmap Overlays (lazy-loaded only when toggled ON)
           {
@@ -713,12 +737,14 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
       }
       updateProjectedOverlays();
       // Apply initial URL-triggered overlays if any
+      const initTopo = showTopoRef.current;
       const initWater = showUsgsWaterRef.current;
       const initLidar = showLidarRef.current;
       const initStyle = lidarStyleRef.current;
       const sv = (id: string, on: boolean) => {
         if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
       };
+      sv('overlay-usgs-topo', initTopo);
       sv('overlay-nasa-smap', initWater);
       sv('overlay-usgs-wbd', initWater);
       sv('overlay-usgs-nhd', initWater);
@@ -1012,6 +1038,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
         map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
       }
     };
+    setVis('overlay-usgs-topo', showTopoOverlay);
     setVis('overlay-nasa-smap', showUsgsWaterOverlay);
     setVis('overlay-usgs-wbd', showUsgsWaterOverlay);
     setVis('overlay-usgs-nhd', showUsgsWaterOverlay);
@@ -1019,7 +1046,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
     setVis('overlay-lidar-elevation', showLidarOverlay && lidarOverlayStyle === 'elevation');
     setVis('overlay-lidar-slope', showLidarOverlay && lidarOverlayStyle === 'slope');
     setVis('overlay-lidar-contours', showLidarOverlay && lidarOverlayStyle === 'contours');
-  }, [showUsgsWaterOverlay, showLidarOverlay, lidarOverlayStyle]);
+  }, [showTopoOverlay, showUsgsWaterOverlay, showLidarOverlay, lidarOverlayStyle]);
 
   useEffect(() => {
     syncEnvOverlayVisibility();
@@ -1499,6 +1526,28 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
           );
         })}
 
+        {/* USGS US Topo Topographical Map Overlay Toggle */}
+        <button
+          type="button"
+          onClick={onToggleTopoOverlay}
+          title="Overlay live USGS US Topo topographical map (elevation contours, terrain shading, benchmarks & hydrography)"
+          className={`glass-pill flex w-[122px] items-center gap-2 rounded-full py-1 pl-1.5 pr-3 text-[11px] font-medium transition-all ${
+            showTopoOverlay
+              ? 'border-[#d4c48a]/75 bg-[#222015]/94 text-[#f5ecd0] shadow-[0_8px_24px_-6px_rgba(212,196,138,0.42)]'
+              : 'text-[#dce2d4]/75 hover:border-[#d4c48a]/45 hover:text-white'
+          }`}
+        >
+          <span
+            className={`h-5 w-5 shrink-0 rounded-full border ${
+              showTopoOverlay ? 'border-[#d4c48a]' : 'border-white/25'
+            }`}
+            style={{
+              background: 'linear-gradient(135deg, #d7cca0 0%, #8ea874 52%, #6d5c43 100%)',
+            }}
+          />
+          <span className="truncate">Topo Map</span>
+        </button>
+
         {/* USGS Water / Drainage / NASA SMAP Soil Moisture Heatmap Overlay Toggle */}
         <button
           type="button"
@@ -1625,8 +1674,23 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
       </div>
 
       {/* Floating Map Overlay Legend (positioned cleanly beside the Zoom capsule above Hide Dock) */}
-      {(activeLayer !== 'satellite' || showUsgsWaterOverlay || showLidarOverlay) && (
+      {(activeLayer !== 'satellite' || showTopoOverlay || showUsgsWaterOverlay || showLidarOverlay) && (
         <div className="glass-panel pointer-events-auto fixed bottom-[336px] right-[62px] z-20 hidden w-[166px] space-y-2 rounded-2xl p-2.5 text-[10px] sm:block">
+            {showTopoOverlay && (
+              <div>
+                <div className="font-semibold text-[#f5ecd0]">USGS US Topo Quad</div>
+                <div
+                  className="mt-1 h-1.5 w-full rounded-full"
+                  style={{
+                    background: 'linear-gradient(90deg, #8ea874 0%, #d7cca0 55%, #8f6b47 100%)',
+                  }}
+                />
+                <div className="mt-0.5 flex justify-between font-mono text-[9px] text-[#dce2d4]/60">
+                  <span>Valleys</span>
+                  <span>Contours / Ridges</span>
+                </div>
+              </div>
+            )}
             {showUsgsWaterOverlay && (
               <div>
                 <div className="font-semibold text-[#8cd7f0]">USGS Water + NASA SMAP</div>

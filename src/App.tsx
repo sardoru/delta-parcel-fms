@@ -157,16 +157,24 @@ export function App() {
   const [activeLayer, setActiveLayer] = useState<MapLayer>('satellite');
   const [showUsgsWaterOverlay, setShowUsgsWaterOverlay] = useState<boolean>(() => {
     try {
-      const ov = new URLSearchParams(window.location.search).get('overlay');
-      return ov === 'water' || ov === 'both';
+      const ov = new URLSearchParams(window.location.search).get('overlay') || '';
+      return ov === 'water' || ov === 'both' || ov.split(',').includes('water');
     } catch {
       return false;
     }
   });
   const [showLidarOverlay, setShowLidarOverlay] = useState<boolean>(() => {
     try {
-      const ov = new URLSearchParams(window.location.search).get('overlay');
-      return ov === 'lidar' || ov === 'both';
+      const ov = new URLSearchParams(window.location.search).get('overlay') || '';
+      return ov === 'lidar' || ov === 'both' || ov.split(',').includes('lidar');
+    } catch {
+      return false;
+    }
+  });
+  const [showTopoOverlay, setShowTopoOverlay] = useState<boolean>(() => {
+    try {
+      const ov = new URLSearchParams(window.location.search).get('overlay') || '';
+      return ov === 'topo' || ov === 'all' || ov.split(',').includes('topo');
     } catch {
       return false;
     }
@@ -734,6 +742,7 @@ export function App() {
         statewideTick={statewideTick}
         nationwideTick={nationwideTick}
         activeLayer={activeLayer}
+        showTopoOverlay={showTopoOverlay}
         showUsgsWaterOverlay={showUsgsWaterOverlay}
         showLidarOverlay={showLidarOverlay}
         lidarOverlayStyle={lidarOverlayStyle}
@@ -753,6 +762,7 @@ export function App() {
           }
         }}
         onChangeLayer={setActiveLayer}
+        onToggleTopoOverlay={() => setShowTopoOverlay((v) => !v)}
         onToggleUsgsWaterOverlay={() => setShowUsgsWaterOverlay((v) => !v)}
         onToggleLidarOverlay={() => setShowLidarOverlay((v) => !v)}
         onChangeLidarOverlayStyle={setLidarOverlayStyle}

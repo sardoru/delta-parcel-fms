@@ -12,6 +12,7 @@ A parcel-first precision agriculture operations cockpit and farmer owner portal 
 
 ### Live USGS Water / Drainage + NASA SMAP & USGS 3DEP 1-Meter LiDAR Map Overlays
 Toggle federal raster heatmaps directly onto the 3D satellite map from either the right-side map rail or inside the left **Health Map** panel (`USGS Water` + `NASA LiDAR` tabs):
+- **USGS US Topo Overlay** ([Open Live](https://delta-parcel-fms.vercel.app/?overlay=topo)) — Streams official **USGS The National Map US Topo** topographic quad tiles (contour lines, elevation shading, benchmarks, and hydrography) blended cleanly beneath parcel boundaries.
 - **USGS Water + NASA SMAP** ([Open Live](https://delta-parcel-fms.vercel.app/?overlay=water&healthTab=water)) — Streams live **USGS NHD** creeks & drainage channels, **USGS WBD HUC-12** watershed boundaries, and **NASA GIBS SMAP L4** surface soil moisture tiles alongside live **USGS National Water Dashboard** stream gages & **FEMA NFHL** flood zones.
 - **USGS 3DEP 1m LiDAR Heatmap** ([Open Live](https://delta-parcel-fms.vercel.app/?overlay=lidar&healthTab=lidar)) — Streams live 1-meter LiDAR elevation tiles with inline **`Elev` | `Slope` | `2ft`** contour switching plus selectable **NASA GEDI L2A** & **ICESat-2 ATL08** orbital LiDAR scans.
 
@@ -85,6 +86,7 @@ Hold **`⌘` / `Ctrl` / `Shift` + Click** on the map to batch-select multiple pa
 | Feature / View | Direct Live URL |
 | --- | --- |
 | Main 3D Satellite Dashboard (Macon, MS) | https://delta-parcel-fms.vercel.app |
+| USGS US Topo Topographical Overlay | https://delta-parcel-fms.vercel.app/?overlay=topo |
 | USGS Water + 1m LiDAR Map Overlays | https://delta-parcel-fms.vercel.app/?overlay=both&healthTab=lidar |
 | Farmer Owner Portal (`My Farm Portal`) | https://delta-parcel-fms.vercel.app/?mode=portal |
 | Parcel Crop Cover & Previous Crops | https://delta-parcel-fms.vercel.app/?drawer=crops |
