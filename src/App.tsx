@@ -40,8 +40,19 @@ import {
   ParcelDetailDrawer,
 } from './components/InspectorDrawers';
 import { CombineCabSimulator } from './components/CombineCabSimulator';
+import { DroneMarketplaceModal } from './components/DroneMarketplaceModal';
+import {
+  DRONE_TERRITORIES,
+  DroneRfqRecord,
+  DroneSprayVendor,
+  DroneTerritory,
+  INITIAL_DRONE_VENDORS,
+} from './data/droneMarketplace';
 
 const CUSTOM_PLOTS_PREFIX = 'deltaplot_ms_custom_v2_';
+const DRONE_VENDORS_KEY = 'deltaplot_drone_vendors_v1';
+const DRONE_TERRITORIES_KEY = 'deltaplot_drone_territories_v1';
+const DRONE_RFQS_KEY = 'deltaplot_drone_rfqs_v1';
 
 const DEFAULT_WEATHER: LiveWeather = {
   tempF: 62,
@@ -81,6 +92,55 @@ export function App() {
     Record<string, ParcelEquipmentOverride>
   >({});
   const [selectedParcelId, setSelectedParcelId] = useState<string>(MS_REGIONS.macon.defaultParcelId);
+  const [multiSelectedParcelIds, setMultiSelectedParcelIds] = useState<string[]>([]);
+  const [bottomDockCollapsed, setBottomDockCollapsed] = useState<boolean>(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('dock') === 'hidden';
+    } catch {
+      return false;
+    }
+  });
+  const [droneModalTab, setDroneModalTab] = useState<'browse' | 'rfq' | 'vendor' | null>(() => {
+    try {
+      const m = new URLSearchParams(window.location.search).get('mode');
+      if (m === 'drone') return 'browse';
+      if (m === 'drone-rfq') return 'rfq';
+      if (m === 'drone-vendor') return 'vendor';
+    } catch {
+      // ignore
+    }
+    return null;
+  });
+  const [droneVendors, setDroneVendors] = useState<DroneSprayVendor[]>(() => {
+    try {
+      const raw = localStorage.getItem(DRONE_VENDORS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_DRONE_VENDORS;
+  });
+  const [droneTerritories, setDroneTerritories] = useState<DroneTerritory[]>(() => {
+    try {
+      const raw = localStorage.getItem(DRONE_TERRITORIES_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DRONE_TERRITORIES;
+  });
+  const [droneRfqs, setDroneRfqs] = useState<DroneRfqRecord[]>(() => {
+    try {
+      const raw = localStorage.getItem(DRONE_RFQS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
   const [activeLayer, setActiveLayer] = useState<MapLayer>('satellite');
   const [unit, setUnit] = useState<AreaUnit>('ac');
   const [hoveredStressCell, setHoveredStressCell] = useState<StressCell | null>(null);
@@ -193,6 +253,98 @@ export function App() {
     () => parcels.find((p) => p.id === selectedParcelId) ?? parcels[0],
     [parcels, selectedParcelId]
   );
+
+  // Full ordered set of active selected parcels (single or Cmd/Shift multi-select batch for Drone Spray RFQs)
+  const selectedParcelIds = useMemo(() => {
+    if (!selectedParcel) return [];
+    const ids = new Set<string>([selectedParcel.id]);
+    for (const id of multiSelectedParcelIds) {
+      if (parcels.some((p) => p.id === id)) ids.add(id);
+    }
+    return Array.from(ids);
+  }, [selectedParcel, multiSelectedParcelIds, parcels]);
+
+  const selectedParcelsList = useMemo(
+    () => selectedParcelIds.map((id) => parcels.find((p) => p.id === id)).filter((p): p is Parcel => Boolean(p)),
+    [selectedParcelIds, parcels]
+  );
+
+  const handleSelectParcelWithModifier = useCallback(
+    (parcelId: string, multiSelect = false) => {
+      setViewMode('region');
+      setHoveredStressCell(null);
+      if (!multiSelect) {
+        setSelectedParcelId(parcelId);
+        setMultiSelectedParcelIds([]);
+        return;
+      }
+      // Cmd / Ctrl / Shift + Click toggles parcel in/out of multi-select quotation batch!
+      setMultiSelectedParcelIds((prev) => {
+        const base = new Set<string>([selectedParcelId, ...prev]);
+        if (base.has(parcelId) && base.size > 1) {
+          base.delete(parcelId);
+          if (parcelId === selectedParcelId) {
+            const firstRemaining = Array.from(base)[0];
+            if (firstRemaining) setSelectedParcelId(firstRemaining);
+          }
+        } else {
+          base.add(parcelId);
+        }
+        return Array.from(base);
+      });
+    },
+    [selectedParcelId]
+  );
+
+  const handleSubmitDroneRfq = (rfq: DroneRfqRecord) => {
+    setDroneRfqs((prev) => {
+      const next = [rfq, ...prev];
+      try { localStorage.setItem(DRONE_RFQS_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const handleAwardDroneQuote = (rfqId: string, vendorId: string) => {
+    let awardedRfq: DroneRfqRecord | undefined;
+    setDroneRfqs((prev) => {
+      const next = prev.map((r) => {
+        if (r.id !== rfqId) return r;
+        awardedRfq = { ...r, awardedVendorId: vendorId };
+        return awardedRfq;
+      });
+      try { localStorage.setItem(DRONE_RFQS_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+    const quote = awardedRfq?.quotes.find((q) => q.vendorId === vendorId);
+    if (awardedRfq && quote) {
+      for (const pid of awardedRfq.parcelIds) {
+        handleAddLog(pid, {
+          date: 'Drone Bid Awarded',
+          category: 'Application',
+          title: `Drone Spray Awarded: ${quote.vendorName}`,
+          operator: `${quote.vendorName} (FAA Part 137)`,
+          detail: `${awardedRfq.applicationType} (${awardedRfq.carrierGpa}) · $${quote.ratePerAcreUsd.toFixed(2)}/ac · Window: ${quote.earliestWindow}.`,
+        });
+      }
+    }
+  };
+
+  const handleRegisterDroneVendor = (vendor: DroneSprayVendor, claimedTerritoryId?: string) => {
+    setDroneVendors((prev) => {
+      const next = [vendor, ...prev];
+      try { localStorage.setItem(DRONE_VENDORS_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+    if (claimedTerritoryId) {
+      setDroneTerritories((prev) => {
+        const next = prev.map((t) =>
+          t.id === claimedTerritoryId ? { ...t, claimedByVendorId: vendor.id } : t
+        );
+        try { localStorage.setItem(DRONE_TERRITORIES_KEY, JSON.stringify(next)); } catch {}
+        return next;
+      });
+    }
+  };
 
   // Dynamically derive real, changeable Tractor/Harvester & Sprayer units bound to the selected parcel!
   const equipment = useMemo<EquipmentUnit[]>(() => {
@@ -437,6 +589,7 @@ export function App() {
         parcels={parcels}
         facilities={facilities}
         selectedParcel={selectedParcel}
+        selectedParcelIds={selectedParcelIds}
         selectedFacility={selectedFacility}
         statewideTick={statewideTick}
         nationwideTick={nationwideTick}
@@ -448,11 +601,7 @@ export function App() {
         isDrawingPlot={isDrawingPlot}
         isSyncingMaris={isSyncingMaris}
         marisSyncMessage={marisSyncMessage}
-        onSelectParcel={(id) => {
-          setViewMode('region');
-          setSelectedParcelId(id);
-          setHoveredStressCell(null);
-        }}
+        onSelectParcel={handleSelectParcelWithModifier}
         onSelectFacility={(fac) => {
           setSelectedFacility(fac);
           if (fac) {
@@ -556,12 +705,17 @@ export function App() {
           {/* Open Interactive Map Window */}
           <div className="hidden flex-1 lg:block" />
 
-          {/* Bottom Telemetry Dock */}
+          {/* Bottom Telemetry Dock (Collapsible & Hideable + Multi-Parcel Drone Spray Marketplace Trigger) */}
           <div className="pointer-events-auto">
             <BottomTelemetryDock
               equipment={equipment}
               selectedParcel={selectedParcel}
+              selectedParcels={selectedParcelsList}
               unit={unit}
+              collapsed={bottomDockCollapsed}
+              onToggleCollapse={() => setBottomDockCollapsed((v) => !v)}
+              onClearMultiSelect={() => setMultiSelectedParcelIds([])}
+              onOpenDroneMarketplace={(tab = 'browse') => setDroneModalTab(tab)}
               onSelectEquipment={(eq) => {
                 setSelectedParcelId(eq.assignedParcelId);
                 setInspectedEquipmentId(eq.id);
@@ -613,6 +767,29 @@ export function App() {
           unit={unit}
           onClose={() => setInspectedEquipmentId(null)}
           onReassignParcel={handleReassignEquipment}
+        />
+      )}
+
+      {/* Ag-Drone Spraying Marketplace, Multi-Parcel Bid RFQ & Vendor Territory Claim Portal */}
+      {droneModalTab && selectedParcelsList.length > 0 && (
+        <DroneMarketplaceModal
+          selectedParcels={selectedParcelsList}
+          unit={unit}
+          vendors={droneVendors}
+          territories={droneTerritories}
+          rfqs={droneRfqs}
+          initialTab={droneModalTab}
+          onClose={() => setDroneModalTab(null)}
+          onRemoveSelectedParcel={(pid) => {
+            setMultiSelectedParcelIds((prev) => prev.filter((x) => x !== pid));
+            if (pid === selectedParcelId && selectedParcelIds.length > 1) {
+              const nextId = selectedParcelIds.find((x) => x !== pid);
+              if (nextId) setSelectedParcelId(nextId);
+            }
+          }}
+          onSubmitRfq={handleSubmitDroneRfq}
+          onAwardQuote={handleAwardDroneQuote}
+          onRegisterVendor={handleRegisterDroneVendor}
         />
       )}
 

@@ -1,10 +1,16 @@
 import React, { useMemo } from 'react';
 import {
   ArrowUpRight,
+  CaretDown,
+  CaretUp,
   Clock,
+  Crown,
   Minus,
+  PaperPlaneTilt,
   Plus,
   SteeringWheel,
+  Storefront,
+  X,
 } from '@phosphor-icons/react';
 import { AreaUnit, EquipmentUnit, Parcel } from '../types/farm';
 import { EQUIPMENT_CATALOG } from '../data/equipmentCatalog';
@@ -13,7 +19,12 @@ import { formatArea, formatSpeed, formatYield } from '../utils/units';
 interface BottomTelemetryDockProps {
   equipment: EquipmentUnit[];
   selectedParcel: Parcel;
+  selectedParcels: Parcel[];
   unit: AreaUnit;
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  onClearMultiSelect: () => void;
+  onOpenDroneMarketplace: (tab?: 'browse' | 'rfq' | 'vendor') => void;
   onSelectEquipment: (eq: EquipmentUnit) => void;
   onChangeEquipmentModel: (slot: 'primary' | 'applicator', catalogId: string) => void;
   onToggleEquipmentStatus: (slot: 'primary' | 'applicator') => void;
@@ -160,7 +171,12 @@ const StepDutyChart: React.FC<{ steps: number[]; accent: string }> = ({ steps, a
 export const BottomTelemetryDock: React.FC<BottomTelemetryDockProps> = ({
   equipment,
   selectedParcel,
+  selectedParcels,
   unit,
+  collapsed,
+  onToggleCollapse,
+  onClearMultiSelect,
+  onOpenDroneMarketplace,
   onSelectEquipment,
   onChangeEquipmentModel,
   onToggleEquipmentStatus,
@@ -169,6 +185,11 @@ export const BottomTelemetryDock: React.FC<BottomTelemetryDockProps> = ({
   onOpenParcelDetail,
   onOpenCabMode,
 }) => {
+  const multiAcres = useMemo(
+    () => Number(selectedParcels.reduce((s, p) => s + p.cultivatedAcres, 0).toFixed(1)),
+    [selectedParcels]
+  );
+  const isMulti = selectedParcels.length > 1;
   const avgVariance = useMemo(() => {
     const offsets = selectedParcel.irrigationOffsets;
     if (offsets.length === 0) return 0;
@@ -187,7 +208,94 @@ export const BottomTelemetryDock: React.FC<BottomTelemetryDockProps> = ({
   }, [yieldFormatted.value]);
 
   return (
-    <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(250px,1.02fr)_minmax(250px,1.02fr)_minmax(340px,1.42fr)]">
+    <div className="flex flex-col gap-2">
+      {/* Slim Floating Control Strip: Multi-Parcel Drone Spray Bids + Collapse / Hide Bottom Dock */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Multi-Parcel Selection Pill */}
+          <div
+            className={`glass-pill flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] transition-all ${
+              isMulti
+                ? 'border-[#5ec8eb]/60 bg-[#102028]/92 text-[#c8f0fc]'
+                : 'text-[#dce2d4]/78'
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                isMulti ? 'animate-pulse bg-[#5ec8eb]' : 'bg-[#d8f274]'
+              }`}
+            />
+            <span className="font-medium">
+              {isMulti ? (
+                <>
+                  <strong className="font-mono text-[#5ec8eb]">{selectedParcels.length} Parcels</strong> ·{' '}
+                  {formatArea(multiAcres, unit)} selected
+                </>
+              ) : (
+                <span className="hidden sm:inline">
+                  Hold <kbd className="rounded bg-white/10 px-1 font-mono text-[9.5px]">⌘</kbd> /{' '}
+                  <kbd className="rounded bg-white/10 px-1 font-mono text-[9.5px]">Shift</kbd> + Click map to
+                  multi-select parcels
+                </span>
+              )}
+            </span>
+            {isMulti && (
+              <button
+                type="button"
+                onClick={onClearMultiSelect}
+                title="Clear multi-parcel selection"
+                className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-[#dce2d4] hover:bg-white/25"
+              >
+                <X size={10} weight="bold" />
+              </button>
+            )}
+          </div>
+
+          {/* Open Drone Spray Marketplace / Request Bids CTA */}
+          <button
+            type="button"
+            onClick={() => onOpenDroneMarketplace(isMulti ? 'rfq' : 'browse')}
+            className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11.5px] font-semibold transition-all active:scale-[0.98] ${
+              isMulti
+                ? 'bg-[#5ec8eb] text-[#0c161b] shadow-[0_8px_22px_-4px_rgba(94,200,235,0.6)] hover:bg-[#82ddfa]'
+                : 'glass-pill border-[#5ec8eb]/40 bg-[#112027]/88 text-[#8cd7f0] hover:border-[#5ec8eb] hover:text-white'
+            }`}
+          >
+            {isMulti ? <PaperPlaneTilt size={13} weight="bold" /> : <Storefront size={13} weight="duotone" />}
+            <span>
+              {isMulti
+                ? `Request Drone Spray Bids (${selectedParcels.length})`
+                : 'Drone Spray Marketplace'}
+            </span>
+          </button>
+
+          {/* Direct Drone Vendor Territory Membership Portal Trigger */}
+          <button
+            type="button"
+            onClick={() => onOpenDroneMarketplace('vendor')}
+            className="glass-pill hidden items-center gap-1 rounded-full border-[#f0bb66]/30 bg-[#1d1911]/85 px-2.5 py-1.5 text-[10.5px] font-medium text-[#f6deb2] transition-colors hover:border-[#f0bb66]/70 hover:text-white md:flex"
+            title="Drone spraying companies: join as Approved Vendor or Claim Exclusive Territory"
+          >
+            <Crown size={12} weight="fill" className="text-[#f0bb66]" />
+            <span>Claim Territory</span>
+          </button>
+        </div>
+
+        {/* Collapsible / Hideable Bottom Fleet & Yield Dock Toggle */}
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          aria-expanded={!collapsed}
+          title={collapsed ? 'Expand Fleet, Irrigation & Yield Telemetry Dock' : 'Collapse & hide bottom telemetry dock'}
+          className="glass-pill flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium text-[#e9eee2] transition-colors hover:border-[#d8f274]/50 hover:text-[#d8f274]"
+        >
+          {collapsed ? <CaretUp size={13} weight="bold" /> : <CaretDown size={13} weight="bold" />}
+          <span>{collapsed ? 'Show Fleet & Yield Dock' : 'Hide Dock'}</span>
+        </button>
+      </div>
+
+      {!collapsed && (
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(250px,1.02fr)_minmax(250px,1.02fr)_minmax(340px,1.42fr)]">
       {/* Live Changeable Equipment Cards (Primary Harvester/Tractor & Sprayer/Applicator) */}
       {equipment.map((eq, cardIdx) => {
         const slot: 'primary' | 'applicator' = eq.slot || (cardIdx === 0 ? 'primary' : 'applicator');
@@ -478,5 +586,7 @@ export const BottomTelemetryDock: React.FC<BottomTelemetryDockProps> = ({
         </div>
       </article>
     </section>
+      )}
+    </div>
   );
 };

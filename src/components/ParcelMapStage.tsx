@@ -39,6 +39,7 @@ interface ParcelMapStageProps {
   parcels: Parcel[];
   facilities: CottonFacility[];
   selectedParcel: Parcel;
+  selectedParcelIds: string[];
   selectedFacility: CottonFacility | null;
   statewideTick: number;
   nationwideTick: number;
@@ -50,7 +51,7 @@ interface ParcelMapStageProps {
   isDrawingPlot: boolean;
   isSyncingMaris: boolean;
   marisSyncMessage: string | null;
-  onSelectParcel: (parcelId: string) => void;
+  onSelectParcel: (parcelId: string, multiSelect?: boolean) => void;
   onSelectFacility: (facility: CottonFacility | null) => void;
   onChangeLayer: (layer: MapLayer) => void;
   onToggleFacilities: () => void;
@@ -92,6 +93,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   parcels,
   facilities,
   selectedParcel,
+  selectedParcelIds,
   selectedFacility,
   statewideTick,
   nationwideTick,
@@ -130,6 +132,10 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   hoveredStressRef.current = hoveredStressCell;
   const isDrawingRef = useRef(isDrawingPlot);
   isDrawingRef.current = isDrawingPlot;
+  const onSelectParcelRef = useRef(onSelectParcel);
+  onSelectParcelRef.current = onSelectParcel;
+  const onSelectFacilityRef = useRef(onSelectFacility);
+  onSelectFacilityRef.current = onSelectFacility;
 
   const [is3D, setIs3D] = useState(true);
   const [hoveredParcelInfo, setHoveredParcelInfo] = useState<{
@@ -200,7 +206,9 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
     }
   }, []);
 
-  // Build MapLibre GeoJSON FeatureCollection for all Como parcels
+  const selectedIdSet = useMemo(() => new Set(selectedParcelIds), [selectedParcelIds]);
+
+  // Build MapLibre GeoJSON FeatureCollection for all parcels (supporting Cmd/Shift multi-parcel selection!)
   const parcelsGeoJson = useMemo(
     () => ({
       type: 'FeatureCollection' as const,
@@ -217,11 +225,12 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
           ndviColor: ndviFillColor(p.ndviMean),
           soilColor: p.soilColor,
           isSelected: p.id === selectedParcel.id ? 1 : 0,
+          isMultiSelected: selectedIdSet.has(p.id) && p.id !== selectedParcel.id ? 1 : 0,
         },
         geometry: p.geometry,
       })),
     }),
-    [parcels, selectedParcel.id]
+    [parcels, selectedParcel.id, selectedIdSet]
   );
 
   const parcelsGeoJsonRef = useRef(parcelsGeoJson);
@@ -375,12 +384,16 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
                 'case',
                 ['==', ['get', 'isSelected'], 1],
                 '#d8f274',
+                ['==', ['get', 'isMultiSelected'], 1],
+                '#5ec8eb',
                 'rgba(255, 255, 255, 0.04)',
               ],
               'fill-opacity': [
                 'case',
                 ['==', ['get', 'isSelected'], 1],
                 0.24,
+                ['==', ['get', 'isMultiSelected'], 1],
+                0.26,
                 0.08,
               ],
             },
@@ -392,6 +405,28 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
             paint: {
               'line-color': 'rgba(244, 248, 236, 0.44)',
               'line-width': 1.25,
+            },
+          },
+          {
+            id: 'parcel-multi-glow',
+            type: 'line',
+            source: 'como-parcels',
+            filter: ['==', ['get', 'isMultiSelected'], 1],
+            paint: {
+              'line-color': '#5ec8eb',
+              'line-width': 10,
+              'line-blur': 7,
+              'line-opacity': 0.72,
+            },
+          },
+          {
+            id: 'parcel-multi-line',
+            type: 'line',
+            source: 'como-parcels',
+            filter: ['==', ['get', 'isMultiSelected'], 1],
+            paint: {
+              'line-color': '#8ee6ff',
+              'line-width': 2.6,
             },
           },
           {
@@ -639,7 +674,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
       if (clickedFacId) {
         const found = facilitiesRef.current.find((f) => f.id === String(clickedFacId));
         if (found) {
-          onSelectFacility(found);
+          onSelectFacilityRef.current(found);
           return;
         }
       }
@@ -647,8 +682,10 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
       const features = map.queryRenderedFeatures(e.point, { layers: ['parcels-fill'] });
       const clickedId = features[0]?.properties?.id;
       if (clickedId) {
-        onSelectFacility(null);
-        onSelectParcel(String(clickedId));
+        onSelectFacilityRef.current(null);
+        const orig = e.originalEvent as MouseEvent | undefined;
+        const isMulti = Boolean(orig?.metaKey || orig?.ctrlKey || orig?.shiftKey);
+        onSelectParcelRef.current(String(clickedId), isMulti);
       }
     });
 
@@ -821,12 +858,16 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
         'case',
         ['==', ['get', 'isSelected'], 1],
         '#d8f274',
+        ['==', ['get', 'isMultiSelected'], 1],
+        '#5ec8eb',
         'rgba(255, 255, 255, 0.04)',
       ]);
       map.setPaintProperty('parcels-fill', 'fill-opacity', [
         'case',
         ['==', ['get', 'isSelected'], 1],
         0.22,
+        ['==', ['get', 'isMultiSelected'], 1],
+        0.26,
         0.08,
       ]);
       map.setPaintProperty('parcels-outline', 'line-color', 'rgba(244, 248, 236, 0.34)');
