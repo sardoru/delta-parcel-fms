@@ -49,7 +49,6 @@ interface TopHudBarProps {
   onSelectEquipment: (eqId: string) => void;
   isDrawingPlot: boolean;
   onToggleDrawPlot: () => void;
-  onOpenCabMode: () => void;
   claimedCount: number;
   pendingClaimCount: number;
   onOpenFarmerPortal: () => void;
@@ -74,7 +73,6 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
   onSelectEquipment,
   isDrawingPlot,
   onToggleDrawPlot,
-  onOpenCabMode,
   claimedCount,
   pendingClaimCount,
   onOpenFarmerPortal,
@@ -404,26 +402,15 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
           type="button"
           onClick={onOpenFarmerPortal}
           title="Open your Farmer Owner Portal (claimed parcels, crop covers, soil tests, postcard claims)"
-          className="glass-pill flex h-10 items-center gap-1.5 rounded-full border-[#7cd8a0]/40 px-3 text-[12px] font-semibold text-[#e6f5ea] transition-all hover:border-[#7cd8a0]/75 hover:bg-[#1a241d]/95 active:scale-[0.98]"
+          className="flex h-10 items-center gap-1.5 rounded-full border border-[#d8f274]/55 bg-[#d8f274] px-3.5 text-[12px] font-bold text-[#141710] shadow-[0_8px_24px_-6px_rgba(216,242,116,0.5)] transition-all hover:bg-[#e7fc95] active:scale-[0.98]"
         >
-          <HouseLine size={15} weight="duotone" className="text-[#7cd8a0]" />
-          <span className="hidden xl:inline">My Farm</span>
+          <HouseLine size={15} weight="fill" />
+          <span className="hidden sm:inline">My Farm Portal</span>
           {(claimedCount > 0 || pendingClaimCount > 0) && (
-            <span className="rounded-full bg-[#7cd8a0]/22 px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#9be8b8]">
+            <span className="rounded-full bg-[#141710]/18 px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#141710]">
               {claimedCount + pendingClaimCount}
             </span>
           )}
-        </button>
-
-        {/* Drive Combine Harvester Cab Simulator Trigger */}
-        <button
-          type="button"
-          onClick={onOpenCabMode}
-          title="Drive Combine Harvester from inside the cab on the active parcel"
-          className="flex h-10 items-center gap-1.5 rounded-full border border-[#d8f274]/55 bg-[#d8f274] px-3.5 text-[12px] font-bold text-[#141710] shadow-[0_8px_24px_-6px_rgba(216,242,116,0.55)] transition-all hover:bg-[#e7fc95] active:scale-[0.98]"
-        >
-          <Tractor size={15} weight="fill" />
-          <span className="hidden sm:inline">Drive Combine</span>
         </button>
 
         {/* Add Parcel Plot Trigger */}

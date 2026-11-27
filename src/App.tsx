@@ -52,7 +52,6 @@ import {
   EquipmentDrawer,
   ParcelDetailDrawer,
 } from './components/InspectorDrawers';
-import { CombineCabSimulator } from './components/CombineCabSimulator';
 import { DroneMarketplaceModal } from './components/DroneMarketplaceModal';
 import { FarmerPortalModal } from './components/FarmerPortalModal';
 import {
@@ -205,13 +204,6 @@ export function App() {
   );
   const [aiInsightsOpen, setAiInsightsOpen] = useState(false);
   const [inspectedEquipmentId, setInspectedEquipmentId] = useState<string | null>(null);
-  const [cabModeOpen, setCabModeOpen] = useState<boolean>(() => {
-    try {
-      return new URLSearchParams(window.location.search).get('mode') === 'cab';
-    } catch {
-      return false;
-    }
-  });
 
   const cacheRef = useRef(regionCache);
   cacheRef.current = regionCache;
@@ -841,10 +833,6 @@ export function App() {
             onSelectEquipment={(eqId) => setInspectedEquipmentId(eqId)}
             isDrawingPlot={isDrawingPlot}
             onToggleDrawPlot={() => setIsDrawingPlot((v) => !v)}
-            onOpenCabMode={() => {
-              setIsDrawingPlot(false);
-              setCabModeOpen(true);
-            }}
             claimedCount={claimedCounts.verified}
             pendingClaimCount={claimedCounts.pending}
             onOpenFarmerPortal={() => setFarmerPortalOpen(true)}
@@ -891,10 +879,6 @@ export function App() {
               onAdjustEquipmentSpeed={handleAdjustEquipmentSpeed}
               onAdjustIrrigationZone={handleAdjustIrrigationZone}
               onOpenParcelDetail={() => setParcelDetailTab('overview')}
-              onOpenCabMode={() => {
-                setIsDrawingPlot(false);
-                setCabModeOpen(true);
-              }}
             />
           </div>
         </div>
@@ -955,11 +939,6 @@ export function App() {
             setFarmerPortalOpen(false);
             setDroneModalTab('rfq');
           }}
-          onOpenCabForParcel={(pid) => {
-            setSelectedParcelId(pid);
-            setFarmerPortalOpen(false);
-            setCabModeOpen(true);
-          }}
         />
       )}
 
@@ -1009,26 +988,6 @@ export function App() {
           onSubmitRfq={handleSubmitDroneRfq}
           onAwardQuote={handleAwardDroneQuote}
           onRegisterVendor={handleRegisterDroneVendor}
-        />
-      )}
-
-      {/* First-Person In-Cab Combine Harvester Driving & RTK AutoTrac Simulator */}
-      {cabModeOpen && selectedParcel && (
-        <CombineCabSimulator
-          parcel={selectedParcel}
-          weather={weather}
-          onExit={(harvestedAcres, harvestedUnits, unitLabel) => {
-            setCabModeOpen(false);
-            if (harvestedAcres >= 0.05) {
-              handleAddLog(selectedParcel.id, {
-                date: 'Live Cab Run',
-                category: 'Harvest',
-                title: `Combine X9 1100 Harvested ${harvestedAcres.toFixed(2)} ac`,
-                operator: 'In-Cab Operator (RTK AutoTrac)',
-                detail: `Harvested ${harvestedAcres.toFixed(2)} ac of ${selectedParcel.crop} (~${harvestedUnits.toLocaleString()} ${unitLabel}) via 40-ft RD40F header.`,
-              });
-            }
-          }}
         />
       )}
     </div>

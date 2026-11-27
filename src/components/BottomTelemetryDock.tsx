@@ -8,7 +8,6 @@ import {
   Minus,
   PaperPlaneTilt,
   Plus,
-  SteeringWheel,
   Storefront,
   X,
 } from '@phosphor-icons/react';
@@ -31,7 +30,6 @@ interface BottomTelemetryDockProps {
   onAdjustEquipmentSpeed: (slot: 'primary' | 'applicator', deltaMph: number) => void;
   onAdjustIrrigationZone: (zoneId: string) => void;
   onOpenParcelDetail: () => void;
-  onOpenCabMode: () => void;
 }
 
 const TractorWireframe: React.FC = () => (
@@ -183,7 +181,6 @@ export const BottomTelemetryDock: React.FC<BottomTelemetryDockProps> = ({
   onAdjustEquipmentSpeed,
   onAdjustIrrigationZone,
   onOpenParcelDetail,
-  onOpenCabMode,
 }) => {
   const multiAcres = useMemo(
     () => Number(selectedParcels.reduce((s, p) => s + p.cultivatedAcres, 0).toFixed(1)),
@@ -315,7 +312,7 @@ export const BottomTelemetryDock: React.FC<BottomTelemetryDockProps> = ({
             key={slot}
             className="glass-panel group flex flex-col justify-between rounded-[22px] p-3.5 transition-all hover:border-white/22"
           >
-            {/* Header with Inline Machine Switcher Dropdown + Cab / Inspect Actions */}
+            {/* Header with Inline Machine Switcher Dropdown + Inspect Action */}
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
@@ -338,17 +335,6 @@ export const BottomTelemetryDock: React.FC<BottomTelemetryDockProps> = ({
               </div>
 
               <div className="flex shrink-0 items-center gap-1">
-                {slot === 'primary' && (
-                  <button
-                    type="button"
-                    onClick={onOpenCabMode}
-                    title="Jump into first-person combine cab on this parcel"
-                    className="flex h-7 items-center gap-1 rounded-full border border-[#d8f274]/35 bg-[#d8f274]/12 px-2 font-mono text-[9.5px] font-semibold text-[#d8f274] transition-colors hover:bg-[#d8f274] hover:text-[#13170f]"
-                  >
-                    <SteeringWheel size={12} weight="bold" />
-                    <span>Cab</span>
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={() => onSelectEquipment(eq)}

@@ -18,7 +18,6 @@ import {
   Plus,
   SealCheck,
   ShieldCheck,
-  Tractor,
   Trash,
   WarningCircle,
   X,
@@ -61,7 +60,6 @@ interface FarmerPortalModalProps {
   onDeleteDocument: (docId: string) => void;
   onVerifyClaimPin: (parcelId: string, pinInput: string) => boolean;
   onOpenDroneRfqForParcels: (parcelIds: string[]) => void;
-  onOpenCabForParcel: (parcelId: string) => void;
 }
 
 export const FarmerPortalModal: React.FC<FarmerPortalModalProps> = ({
@@ -81,7 +79,6 @@ export const FarmerPortalModal: React.FC<FarmerPortalModalProps> = ({
   onDeleteDocument,
   onVerifyClaimPin,
   onOpenDroneRfqForParcels,
-  onOpenCabForParcel,
 }) => {
   const [activeTab, setActiveTab] = useState<PortalTab>(initialTab);
   const [showAllInCrops, setShowAllInCrops] = useState(false);
@@ -660,11 +657,11 @@ export const FarmerPortalModal: React.FC<FarmerPortalModalProps> = ({
                             </button>
                             <button
                               type="button"
-                              onClick={() => onOpenCabForParcel(claim.parcelId)}
-                              className="flex items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] py-1.5 font-medium text-[#dce2d4] hover:border-[#d8f274]/50 hover:text-[#d8f274]"
+                              onClick={() => onOpenDroneRfqForParcels([claim.parcelId])}
+                              className="flex items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] py-1.5 font-medium text-[#dce2d4] hover:border-[#5ec8eb]/50 hover:text-[#8edcf5]"
                             >
-                              <Tractor size={13} />
-                              Drive Cab
+                              <PaperPlaneTilt size={13} className="text-[#5ec8eb]" />
+                              Drone Bid
                             </button>
                           </div>
                         </div>
