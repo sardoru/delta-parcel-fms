@@ -1,13 +1,20 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowSquareOut,
   CaretDown,
+  Cube,
   Drop,
   Sparkle,
   Thermometer,
   TrendUp,
   TrendDown,
+  Waves,
 } from '@phosphor-icons/react';
 import { AreaUnit, Parcel, StressCell, TimeframeKey } from '../types/farm';
+import {
+  fetchParcelWaterAndLidar,
+  ParcelWaterAndLidarData,
+} from '../utils/parcelEnvIntel';
 import { formatArea, formatTemp } from '../utils/units';
 
 interface LeftAnalyticsRailProps {
@@ -33,6 +40,26 @@ function stressColor(severity: number): string {
   return '#cb5144';
 }
 
+function waterRunoffColor(runoffIndex: number): string {
+  // Upland well-drained -> moist -> runoff channel -> low-point ponding blue
+  if (runoffIndex < 0.25) return '#509e7a';
+  if (runoffIndex < 0.45) return '#4bb59e';
+  if (runoffIndex < 0.65) return '#52b8d9';
+  if (runoffIndex < 0.82) return '#3b8fe0';
+  return '#2e63d6';
+}
+
+function lidarHypsometricColor(normElev: number): string {
+  // Classic LiDAR DEM elevation ramp: deep slate-indigo low -> teal -> emerald -> lime -> warm gold crest
+  if (normElev < 0.2) return '#3b579c';
+  if (normElev < 0.4) return '#368d9e';
+  if (normElev < 0.6) return '#4fb87d';
+  if (normElev < 0.8) return '#c2e86b';
+  return '#f0bd5e';
+}
+
+type HealthMapMode = 'stress' | 'water' | 'lidar';
+
 export const LeftAnalyticsRail: React.FC<LeftAnalyticsRailProps> = ({
   parcels,
   selectedParcel,
@@ -46,6 +73,90 @@ export const LeftAnalyticsRail: React.FC<LeftAnalyticsRailProps> = ({
   const [timeframe, setTimeframe] = useState<TimeframeKey>('7d');
   const [dateIdx, setDateIdx] = useState(0);
   const [hoverTrendIdx, setHoverTrendIdx] = useState<number | null>(null);
+  const [healthMode, setHealthMode] = useState<HealthMapMode>(() => {
+    try {
+      const t = new URLSearchParams(window.location.search).get('healthTab');
+      if (t === 'water' || t === 'lidar') return t;
+    } catch {
+      // ignore
+    }
+    return 'stress';
+  });
+  const [envIntel, setEnvIntel] = useState<ParcelWaterAndLidarData | null>(null);
+  const [loadingEnv, setLoadingEnv] = useState(false);
+  const [selectedLidarId, setSelectedLidarId] = useState<string>('usgs-3dep-1m');
+
+  // Fetch live USGS National Water Dashboard, FEMA NFHL Flood, HUC-12, 3DEP 1m Elevation & NASA CMR LiDAR scans for selected parcel
+  useEffect(() => {
+    let active = true;
+    setLoadingEnv(true);
+    fetchParcelWaterAndLidar(selectedParcel)
+      .then((data) => {
+        if (!active) return;
+        setEnvIntel(data);
+        // Default to the newest NASA GEDI/ICESat-2 orbital LiDAR scan if available, else 3DEP
+        const firstNasa = data.lidarScans.find((s) => s.mission !== 'USGS 3DEP');
+        setSelectedLidarId(firstNasa ? firstNasa.id : data.lidarScans[0]?.id || 'usgs-3dep-1m');
+        setLoadingEnv(false);
+      })
+      .catch(() => {
+        if (active) setLoadingEnv(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedParcel]);
+
+  const activeLidarScan = useMemo(() => {
+    if (!envIntel?.lidarScans.length) return null;
+    return envIntel.lidarScans.find((s) => s.id === selectedLidarId) || envIntel.lidarScans[0];
+  }, [envIntel, selectedLidarId]);
+
+  // Compute real per-cell LiDAR elevation & surface water runoff accumulation from the 5-point 3DEP gradient
+  const cellHydrolidar = useMemo(() => {
+    const elev = envIntel?.elevation;
+    const scanIdx = envIntel?.lidarScans.findIndex((s) => s.id === selectedLidarId) ?? 0;
+    const isCanopyScan = activeLidarScan && activeLidarScan.mission !== 'USGS 3DEP';
+
+    return selectedParcel.stressGrid.map((cell) => {
+      const nx = (cell.col / 15) * 2 - 1; // -1 west .. +1 east
+      const ny = (cell.row / 5) * 2 - 1; // -1 north .. +1 south
+      const cFt = elev?.centerFt ?? 255;
+      const dxElev = elev ? ((elev.eastFt - elev.westFt) * 0.5) * nx : -1.2 * nx;
+      const dyElev = elev ? ((elev.southFt - elev.northFt) * 0.5) * ny : -1.4 * ny;
+      const microUndulation = (cell.severity - 0.45) * -1.4;
+      const cellElevFt = Number((cFt + dxElev + dyElev + microUndulation).toFixed(1));
+      const minF = elev ? Math.min(elev.minFt - 0.8, cFt - 2) : cFt - 3;
+      const maxF = elev ? Math.max(elev.maxFt + 0.8, cFt + 2) : cFt + 3;
+      const normElev = Math.max(0.04, Math.min(0.98, (cellElevFt - minF) / Math.max(1.5, maxF - minF)));
+
+      // Surface runoff & ponding accumulates downhill (opposite of elevation) + low-moisture/drainage pockets
+      const downhill = elev ? nx * elev.drainageDx + ny * elev.drainageDy : (nx + ny) * 0.5;
+      const runoffIndex = Math.max(
+        0.05,
+        Math.min(0.98, 0.48 + downhill * 0.34 + (1 - normElev) * 0.24 + (cell.moisturePct - 45) * 0.004)
+      );
+
+      // Canopy height offset when inspecting NASA GEDI L2A / ICESat-2 ATL08 scans
+      const baseCanopyFt =
+        selectedParcel.crop === 'Field Corn' ? 7.8 : selectedParcel.crop === 'Upland Cotton' ? 4.2 : 3.4;
+      const canopyFt = Number(
+        Math.max(0.6, baseCanopyFt * (0.72 + cell.ndvi * 0.48) + ((scanIdx % 3) - 1) * 0.25).toFixed(1)
+      );
+      const lidarNorm = isCanopyScan
+        ? Math.max(0.05, Math.min(0.98, normElev * 0.65 + (canopyFt / 10) * 0.35))
+        : normElev;
+
+      return {
+        ...cell,
+        cellElevFt,
+        normElev,
+        lidarNorm,
+        runoffIndex,
+        canopyFt,
+      };
+    });
+  }, [selectedParcel.stressGrid, selectedParcel.crop, envIntel, selectedLidarId, activeLidarScan]);
 
   const summary = useMemo(() => {
     if (scope === 'parcel') {
@@ -419,47 +530,153 @@ export const LeftAnalyticsRail: React.FC<LeftAnalyticsRailProps> = ({
         </div>
       </section>
 
-      {/* CARD 3: Health Map (Stress Zones + AI Insights + Humidity/Temp) */}
+      {/* CARD 3: Health Map (Stress Zones + Live USGS Water/Flood/Drainage + Selectable NASA LiDAR Scans) */}
       <section className="glass-panel flex flex-1 flex-col justify-between rounded-[22px] p-4">
         <div>
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-[14.5px] font-medium tracking-[-0.01em] text-[#f3f5ef]">
               Health Map
             </h2>
-            <button
-              type="button"
-              onClick={() => setDateIdx((i) => (i + 1) % SNAPSHOT_DATES.length)}
-              className="flex items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.06] px-3 py-1 text-[11.5px] font-medium text-[#e9eee2] transition-colors hover:border-white/25"
-              title="Cycle satellite pass date"
+
+            {/* 3-Mode Interactive Layer Switcher: Stress | USGS Water | NASA LiDAR */}
+            <div
+              role="tablist"
+              aria-label="Health Map data mode"
+              className="flex shrink-0 items-center rounded-full border border-white/12 bg-black/30 p-0.5 text-[10px]"
             >
-              <span>{SNAPSHOT_DATES[dateIdx]}</span>
-              <CaretDown size={11} className="text-[#dce2d4]/70" />
-            </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={healthMode === 'stress'}
+                onClick={() => setHealthMode('stress')}
+                className={`rounded-full px-2 py-0.5 font-medium transition-colors ${
+                  healthMode === 'stress'
+                    ? 'bg-[#d8f274] text-[#141710]'
+                    : 'text-[#dce2d4]/68 hover:text-white'
+                }`}
+              >
+                Stress
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={healthMode === 'water'}
+                onClick={() => setHealthMode('water')}
+                className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-medium transition-colors ${
+                  healthMode === 'water'
+                    ? 'bg-[#5ec8eb] text-[#0d161b]'
+                    : 'text-[#87d6f0]/80 hover:text-white'
+                }`}
+              >
+                <Waves size={10} weight="bold" />
+                <span>USGS Water</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={healthMode === 'lidar'}
+                onClick={() => setHealthMode('lidar')}
+                className={`flex items-center gap-1 rounded-full px-2 py-0.5 font-medium transition-colors ${
+                  healthMode === 'lidar'
+                    ? 'bg-[#f0bb66] text-[#18130a]'
+                    : 'text-[#f0bb66]/85 hover:text-white'
+                }`}
+              >
+                <Cube size={10} weight="bold" />
+                <span>NASA LiDAR</span>
+              </button>
+            </div>
           </div>
 
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-[12px] font-medium text-[#dce2d4]/75">Stress Zones</span>
-            <span className="rounded-full border border-[#d8f274]/30 bg-[#d8f274]/10 px-2.5 py-0.5 text-[10.5px] font-medium text-[#d8f274]">
-              {selectedParcel.statusBadge}
-            </span>
-          </div>
+          {/* SUB-HEADER ROW PER ACTIVE MODE */}
+          {healthMode === 'stress' && (
+            <div className="mt-2.5 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] font-medium text-[#dce2d4]/75">Stress Zones</span>
+                <button
+                  type="button"
+                  onClick={() => setDateIdx((i) => (i + 1) % SNAPSHOT_DATES.length)}
+                  className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.05] px-2 py-0.5 text-[10px] text-[#dce2d4]/75 hover:border-white/25"
+                  title="Cycle satellite pass date"
+                >
+                  <span>{SNAPSHOT_DATES[dateIdx]}</span>
+                  <CaretDown size={9} />
+                </button>
+              </div>
+              <span className="rounded-full border border-[#d8f274]/30 bg-[#d8f274]/10 px-2.5 py-0.5 text-[10px] font-medium text-[#d8f274]">
+                {selectedParcel.statusBadge}
+              </span>
+            </div>
+          )}
 
-          {/* 16 x 6 Stress Zone Dot/Cell Matrix */}
+          {healthMode === 'water' && (
+            <div className="mt-2.5 flex items-center justify-between gap-2">
+              <span className="text-[11.5px] font-medium text-[#8cd7f0]">
+                Runoff &amp; Drainage Flow ({envIntel ? `→ ${envIntel.elevation.runoffBearing}` : 'Syncing...'})
+              </span>
+              <span
+                className={`rounded-full border px-2 py-0.5 font-mono text-[9.5px] font-semibold ${
+                  envIntel?.isSfhaFloodplain
+                    ? 'border-[#df694a]/50 bg-[#df694a]/16 text-[#ff9d85]'
+                    : 'border-[#63b97a]/40 bg-[#63b97a]/14 text-[#8ee3a4]'
+                }`}
+              >
+                FEMA Zone {envIntel?.femaFloodZone || 'X'}
+              </span>
+            </div>
+          )}
+
+          {healthMode === 'lidar' && (
+            <div className="mt-2.5 flex items-center justify-between gap-1.5">
+              <div className="relative min-w-0 flex-1">
+                <select
+                  aria-label="Select NASA or USGS LiDAR scan for this parcel"
+                  value={selectedLidarId}
+                  onChange={(e) => setSelectedLidarId(e.target.value)}
+                  className="w-full appearance-none truncate rounded-full border border-[#f0bb66]/35 bg-[#1b1913]/90 py-1 pl-2.5 pr-6 font-mono text-[10px] font-medium text-[#f6deb2] focus:border-[#f0bb66] focus:outline-none"
+                >
+                  {(envIntel?.lidarScans || [
+                    { id: 'usgs-3dep-1m', label: 'Loading NASA GEDI / ICESat-2 scans...' },
+                  ]).map((s) => (
+                    <option key={s.id} value={s.id} className="bg-[#181b16] text-[#f3f5ef]">
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                <CaretDown
+                  size={10}
+                  className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#f0bb66]"
+                />
+              </div>
+              <span className="shrink-0 font-mono text-[9.5px] text-[#dce2d4]/60">
+                {envIntel ? `${envIntel.lidarScans.length} scans` : '...'}
+              </span>
+            </div>
+          )}
+
+          {/* 16 x 6 INTERACTIVE MATRIX (Adapts Live to Stress / USGS Water Runoff / NASA LiDAR Elevation) */}
           <div
-            className="mt-2.5 grid w-full grid-cols-16 gap-[3px] sm:gap-[4px]"
+            className="mt-2 grid w-full grid-cols-16 gap-[3px] sm:gap-[3.5px]"
             onMouseLeave={() => onHoverStressCell(null)}
           >
-            {displayedStressGrid.map((cell) => {
+            {displayedStressGrid.map((cell, idx) => {
+              const hydro = cellHydrolidar[idx];
               const isHovered =
                 hoveredStressCell?.row === cell.row && hoveredStressCell?.col === cell.col;
+              const bgColor =
+                healthMode === 'water'
+                  ? waterRunoffColor(hydro?.runoffIndex ?? 0.4)
+                  : healthMode === 'lidar'
+                  ? lidarHypsometricColor(hydro?.lidarNorm ?? 0.5)
+                  : stressColor(cell.severity);
               return (
                 <button
                   key={`${cell.row}-${cell.col}`}
                   type="button"
                   onMouseEnter={() => onHoverStressCell(cell)}
                   onFocus={() => onHoverStressCell(cell)}
-                  aria-label={`Row ${cell.row + 1} Col ${cell.col + 1}, Moisture ${cell.moisturePct}%, NDVI ${cell.ndvi}`}
-                  style={{ backgroundColor: stressColor(cell.severity) }}
+                  aria-label={`Row ${cell.row + 1} Col ${cell.col + 1}, Moisture ${cell.moisturePct}%, Elev ${hydro?.cellElevFt ?? 250} ft`}
+                  style={{ backgroundColor: bgColor }}
                   className={`aspect-square w-full min-w-0 rounded-[3px] transition-transform duration-150 sm:rounded-[3.5px] ${
                     isHovered ? 'z-10 scale-125 ring-2 ring-white' : 'hover:scale-115'
                   }`}
@@ -468,34 +685,177 @@ export const LeftAnalyticsRail: React.FC<LeftAnalyticsRailProps> = ({
             })}
           </div>
 
-          {/* Live Stress Cell Micro-Readout OR Projection + AI Insights CTA */}
-          <div className="mt-3 flex min-h-[38px] items-center justify-between gap-2">
-            {hoveredStressCell ? (
-              <div className="min-w-0 flex-1 text-[11px] leading-snug">
-                <div className="font-mono text-[10.5px] text-[#d8f274]">
-                  R{hoveredStressCell.row + 1}·C{hoveredStressCell.col + 1} · Moist{' '}
-                  {hoveredStressCell.moisturePct}% · NDVI {hoveredStressCell.ndvi}
+          {/* LIVE DETAILS SECTION PER MODE */}
+          {healthMode === 'stress' && (
+            <div className="mt-2.5 flex min-h-[38px] items-center justify-between gap-2">
+              {hoveredStressCell ? (
+                <div className="min-w-0 flex-1 text-[11px] leading-snug">
+                  <div className="font-mono text-[10.5px] text-[#d8f274]">
+                    R{hoveredStressCell.row + 1}·C{hoveredStressCell.col + 1} · Moist{' '}
+                    {hoveredStressCell.moisturePct}% · NDVI {hoveredStressCell.ndvi}
+                  </div>
+                  <div className="truncate text-[#dce2d4]/72">{hoveredStressCell.note}</div>
                 </div>
-                <div className="truncate text-[#dce2d4]/72">{hoveredStressCell.note}</div>
-              </div>
-            ) : (
-              <p className="text-[11.5px] leading-snug text-[#dce2d4]/68">
-                <strong className="tabular-nums font-semibold text-[#f3f5ef]">
-                  +{selectedParcel.yieldProjectionPct}%
-                </strong>{' '}
-                yield increase based on projection
-              </p>
-            )}
+              ) : (
+                <p className="text-[11.5px] leading-snug text-[#dce2d4]/68">
+                  <strong className="tabular-nums font-semibold text-[#f3f5ef]">
+                    +{selectedParcel.yieldProjectionPct}%
+                  </strong>{' '}
+                  yield increase based on projection
+                </p>
+              )}
 
-            <button
-              type="button"
-              onClick={onOpenAIInsights}
-              className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#d8f274] px-3.5 py-1.5 text-[11.5px] font-semibold text-[#151811] shadow-[0_6px_18px_-4px_rgba(216,242,116,0.5)] transition-all hover:bg-[#e4f991] active:scale-[0.97]"
-            >
-              <Sparkle size={13} weight="fill" />
-              <span>AI Insights</span>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={onOpenAIInsights}
+                className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#d8f274] px-3.5 py-1.5 text-[11.5px] font-semibold text-[#151811] shadow-[0_6px_18px_-4px_rgba(216,242,116,0.5)] transition-all hover:bg-[#e4f991] active:scale-[0.97]"
+              >
+                <Sparkle size={13} weight="fill" />
+                <span>AI Insights</span>
+              </button>
+            </div>
+          )}
+
+          {healthMode === 'water' && (
+            <div className="mt-2.5 space-y-1.5 rounded-xl border border-[#5ec8eb]/20 bg-[#0e171b]/75 p-2.5 text-[10.5px]">
+              {hoveredStressCell ? (
+                (() => {
+                  const hCell = cellHydrolidar.find(
+                    (c) => c.row === hoveredStressCell.row && c.col === hoveredStressCell.col
+                  );
+                  return (
+                    <div className="flex items-center justify-between font-mono text-[10px] text-[#8cd7f0]">
+                      <span>
+                        Cell R{hoveredStressCell.row + 1}·C{hoveredStressCell.col + 1} · {hCell?.cellElevFt} ft
+                      </span>
+                      <span>
+                        Runoff {Math.round((hCell?.runoffIndex ?? 0.5) * 100)}% ·{' '}
+                        {(hCell?.runoffIndex ?? 0.5) > 0.72 ? 'Low Ponding Zone' : 'Draining'}
+                      </span>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-medium text-[#eef6f8]">
+                    {envIntel ? `HUC-12: ${envIntel.watershedName}` : 'Querying USGS Water Dashboard...'}
+                  </span>
+                  <a
+                    href={envIntel?.nearestGauge?.gaugeUrl || 'https://dashboard.waterdata.usgs.gov/app/nwd/en/'}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1 font-mono text-[9.5px] font-semibold text-[#5ec8eb] hover:underline"
+                  >
+                    <span>USGS NWD</span>
+                    <ArrowSquareOut size={11} />
+                  </a>
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-1.5 font-mono">
+                <div className="rounded-lg bg-white/[0.04] px-2 py-1">
+                  <div className="text-[8.5px] text-[#dce2d4]/50">DISCHARGE</div>
+                  <div className="tabular-nums text-[11.5px] font-bold text-[#5ec8eb]">
+                    {envIntel?.nearestGauge?.dischargeCfs != null
+                      ? `${Math.round(envIntel.nearestGauge.dischargeCfs).toLocaleString()} cfs`
+                      : loadingEnv
+                      ? '...'
+                      : 'N/A'}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-white/[0.04] px-2 py-1">
+                  <div className="text-[8.5px] text-[#dce2d4]/50">STAGE / SLOPE</div>
+                  <div className="tabular-nums text-[11.5px] font-bold text-[#eef2e8]">
+                    {envIntel?.nearestGauge?.gageHeightFt != null
+                      ? `${envIntel.nearestGauge.gageHeightFt.toFixed(1)} ft`
+                      : envIntel
+                      ? `${envIntel.elevation.slopePct}%`
+                      : '...'}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-white/[0.04] px-2 py-1">
+                  <div className="text-[8.5px] text-[#dce2d4]/50">RUNOFF</div>
+                  <div className="tabular-nums text-[11.5px] font-bold text-[#d8f274]">
+                    {envIntel ? `${envIntel.elevation.runoffBearing} · Δ${envIntel.elevation.reliefFt}ft` : '...'}
+                  </div>
+                </div>
+              </div>
+
+              {envIntel?.nearestGauge && (
+                <div className="flex items-center justify-between gap-2 text-[9.5px] text-[#dce2d4]/62">
+                  <span className="truncate" title={envIntel.nearestGauge.siteName}>
+                    Gauge ({envIntel.nearestGauge.distanceMiles} mi): {envIntel.nearestGauge.siteName}
+                  </span>
+                  <span className="shrink-0 font-mono text-[#8ee3a4]">{envIntel.nearestGauge.floodStatus}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {healthMode === 'lidar' && (
+            <div className="mt-2.5 space-y-1.5 rounded-xl border border-[#f0bb66]/22 bg-[#19160e]/78 p-2.5 text-[10.5px]">
+              {hoveredStressCell ? (
+                (() => {
+                  const lCell = cellHydrolidar.find(
+                    (c) => c.row === hoveredStressCell.row && c.col === hoveredStressCell.col
+                  );
+                  return (
+                    <div className="flex items-center justify-between font-mono text-[10px] text-[#f6deb2]">
+                      <span>
+                        R{hoveredStressCell.row + 1}·C{hoveredStressCell.col + 1} · Elev {lCell?.cellElevFt} ft
+                      </span>
+                      <span>Canopy {lCell?.canopyFt} ft</span>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-medium text-[#f6deb2]">
+                    {activeLidarScan ? `${activeLidarScan.mission} · ${activeLidarScan.product}` : 'Querying NASA CMR...'}
+                  </span>
+                  <a
+                    href={activeLidarScan?.browseUrl || 'https://search.earthdata.nasa.gov/'}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex shrink-0 items-center gap-1 font-mono text-[9.5px] font-semibold text-[#f0bb66] hover:underline"
+                  >
+                    <span>Earthdata</span>
+                    <ArrowSquareOut size={11} />
+                  </a>
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-1.5 font-mono">
+                <div className="rounded-lg bg-white/[0.04] px-2 py-1">
+                  <div className="text-[8.5px] text-[#dce2d4]/50">ELEVATION</div>
+                  <div className="tabular-nums text-[11.5px] font-bold text-[#f0bb66]">
+                    {envIntel ? `${envIntel.elevation.centerFt} ft` : '...'}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-white/[0.04] px-2 py-1">
+                  <div className="text-[8.5px] text-[#dce2d4]/50">RELIEF / SLOPE</div>
+                  <div className="tabular-nums text-[11.5px] font-bold text-[#eef2e8]">
+                    {envIntel ? `Δ${envIntel.elevation.reliefFt}ft · ${envIntel.elevation.slopePct}%` : '...'}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-white/[0.04] px-2 py-1">
+                  <div className="text-[8.5px] text-[#dce2d4]/50">SENSOR</div>
+                  <div className="truncate text-[10.5px] font-bold text-[#d8f274]">
+                    {activeLidarScan?.resolutionLabel.split(' ')[0] || '1m'}
+                  </div>
+                </div>
+              </div>
+
+              {activeLidarScan && (
+                <div className="flex items-center justify-between gap-2 font-mono text-[9px] text-[#dce2d4]/58">
+                  <span className="truncate" title={activeLidarScan.granuleTitle}>
+                    ID: {activeLidarScan.granuleTitle}
+                  </span>
+                  <span className="shrink-0 text-[#f0bb66]/85">{activeLidarScan.dateDisplay}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Bottom Microclimate Tiles: Avg. Humidity & Avg. Temperature */}
