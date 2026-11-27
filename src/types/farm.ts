@@ -179,6 +179,31 @@ export interface DeltaAlert {
   parcelId?: string;
 }
 
+export interface CottonFacility {
+  id: string;
+  kind: 'gin' | 'warehouse';
+  name: string;
+  code: string;
+  address: string;
+  city: string;
+  county: string;
+  state: 'MS';
+  zip: string;
+  lat: number;
+  lng: number;
+  estBales2024?: number | null;
+  countyProduction2024?: number | null;
+  countyAcres2024?: number | null;
+  countyYield2024?: number | null;
+  capacityBales?: number | null;
+  deliveryPoint?: string;
+  detail?: string;
+  contact?: string;
+  email?: string;
+  phone?: string;
+  iceLicensed?: boolean;
+}
+
 export interface LiveWeather {
   tempF: number;
   windMph: number;

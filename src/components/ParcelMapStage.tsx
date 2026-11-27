@@ -15,27 +15,48 @@ import {
   Cube,
   Factory,
   Leaf,
+  MapPinArea,
   Minus,
   Plus,
   Trash,
+  Warehouse,
+  X,
 } from '@phosphor-icons/react';
-import { AreaUnit, GeoGeometry, LngLat, MapLayer, Parcel, RegionConfig, StressCell } from '../types/farm';
+import {
+  AreaUnit,
+  CottonFacility,
+  GeoGeometry,
+  LngLat,
+  MapLayer,
+  Parcel,
+  RegionConfig,
+  StressCell,
+} from '../types/farm';
 import { computeGeodesicAcres, formatArea } from '../utils/units';
 
 interface ParcelMapStageProps {
   region: RegionConfig;
   parcels: Parcel[];
+  facilities: CottonFacility[];
   selectedParcel: Parcel;
+  selectedFacility: CottonFacility | null;
+  statewideTick: number;
   activeLayer: MapLayer;
+  showFacilities: boolean;
   unit: AreaUnit;
   hoveredStressCell: StressCell | null;
   isDrawingPlot: boolean;
   isSyncingMaris: boolean;
   marisSyncMessage: string | null;
   onSelectParcel: (parcelId: string) => void;
+  onSelectFacility: (facility: CottonFacility | null) => void;
   onChangeLayer: (layer: MapLayer) => void;
+  onToggleFacilities: () => void;
   onOpenParcelDetail: () => void;
-  onSyncMarisBounds: (bounds: { west: number; south: number; east: number; north: number }) => void;
+  onSyncMarisBounds: (
+    bounds: { west: number; south: number; east: number; north: number },
+    overrideLayerId?: 1 | 2
+  ) => void;
   onFinishDrawPlot: (payload: {
     name: string;
     county: string;
@@ -60,15 +81,21 @@ function ndviFillColor(ndvi: number): string {
 export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   region,
   parcels,
+  facilities,
   selectedParcel,
+  selectedFacility,
+  statewideTick,
   activeLayer,
+  showFacilities,
   unit,
   hoveredStressCell,
   isDrawingPlot,
   isSyncingMaris,
   marisSyncMessage,
   onSelectParcel,
+  onSelectFacility,
   onChangeLayer,
+  onToggleFacilities,
   onOpenParcelDetail,
   onSyncMarisBounds,
   onFinishDrawPlot,
@@ -83,6 +110,8 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
 
   const regionRef = useRef(region);
   regionRef.current = region;
+  const facilitiesRef = useRef(facilities);
+  facilitiesRef.current = facilities;
   const selectedParcelRef = useRef(selectedParcel);
   selectedParcelRef.current = selectedParcel;
   const hoveredStressRef = useRef(hoveredStressCell);
@@ -93,9 +122,8 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   const [is3D, setIs3D] = useState(true);
   const [hoveredParcelInfo, setHoveredParcelInfo] = useState<{
     name: string;
-    parno: string;
-    acres: number;
-    health: number;
+    subline: string;
+    accent: string;
     x: number;
     y: number;
   } | null>(null);
@@ -186,6 +214,34 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   const parcelsGeoJsonRef = useRef(parcelsGeoJson);
   parcelsGeoJsonRef.current = parcelsGeoJson;
 
+  // Build MapLibre GeoJSON FeatureCollection for all 40 Mississippi Cotton Gins & Warehouses
+  const facilitiesGeoJson = useMemo(
+    () => ({
+      type: 'FeatureCollection' as const,
+      features: facilities.map((f, idx) => ({
+        type: 'Feature' as const,
+        id: idx + 1,
+        properties: {
+          id: f.id,
+          kind: f.kind,
+          name: f.name,
+          city: f.city,
+          county: f.county,
+          bales: f.kind === 'gin' ? f.estBales2024 || 20000 : f.capacityBales || 80000,
+          isSelected: selectedFacility?.id === f.id ? 1 : 0,
+        },
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [f.lng, f.lat],
+        },
+      })),
+    }),
+    [facilities, selectedFacility?.id]
+  );
+
+  const facilitiesGeoJsonRef = useRef(facilitiesGeoJson);
+  facilitiesGeoJsonRef.current = facilitiesGeoJson;
+
   // Draft polygon GeoJSON for geodesic plotting mode
   const draftGeoJson = useMemo(() => {
     const features: GeoJSON.Feature[] = [];
@@ -254,6 +310,10 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
           'como-parcels': {
             type: 'geojson',
             data: parcelsGeoJsonRef.current as unknown as GeoJSON.FeatureCollection,
+          },
+          'ms-facilities': {
+            type: 'geojson',
+            data: facilitiesGeoJsonRef.current as unknown as GeoJSON.FeatureCollection,
           },
           'draft-parcel': {
             type: 'geojson',
@@ -337,6 +397,84 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
               'line-width': 3.2,
             },
           },
+          // All 38 Mississippi Cotton Gins (amber-gold) & 2 Mississippi Cotton Warehouses (sky-cyan)
+          {
+            id: 'ms-facilities-halo',
+            type: 'circle',
+            source: 'ms-facilities',
+            paint: {
+              'circle-radius': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                6,
+                ['case', ['==', ['get', 'kind'], 'warehouse'], 14, 11],
+                12,
+                ['case', ['==', ['get', 'kind'], 'warehouse'], 20, 16],
+              ],
+              'circle-color': [
+                'case',
+                ['==', ['get', 'kind'], 'warehouse'],
+                '#5ec8eb',
+                '#f0bb66',
+              ],
+              'circle-blur': 0.85,
+              'circle-opacity': [
+                'case',
+                ['==', ['get', 'isSelected'], 1],
+                0.78,
+                0.38,
+              ],
+            },
+          },
+          {
+            id: 'ms-facilities-dot',
+            type: 'circle',
+            source: 'ms-facilities',
+            paint: {
+              'circle-radius': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                6,
+                ['case', ['==', ['get', 'kind'], 'warehouse'], 7.5, 5.5],
+                12,
+                ['case', ['==', ['get', 'kind'], 'warehouse'], 10, 7.5],
+              ],
+              'circle-color': [
+                'case',
+                ['==', ['get', 'kind'], 'warehouse'],
+                '#5ec8eb',
+                '#f0bb66',
+              ],
+              'circle-stroke-color': [
+                'case',
+                ['==', ['get', 'isSelected'], 1],
+                '#ffffff',
+                '#141710',
+              ],
+              'circle-stroke-width': [
+                'case',
+                ['==', ['get', 'isSelected'], 1],
+                3,
+                1.8,
+              ],
+            },
+          },
+          {
+            id: 'ms-facilities-core',
+            type: 'circle',
+            source: 'ms-facilities',
+            paint: {
+              'circle-radius': [
+                'case',
+                ['==', ['get', 'kind'], 'warehouse'],
+                3.2,
+                2.2,
+              ],
+              'circle-color': '#141710',
+            },
+          },
           {
             id: 'draft-fill',
             type: 'fill',
@@ -405,12 +543,39 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
     map.on('resize', updateProjectedOverlays);
     map.on('idle', updateProjectedOverlays);
 
+    map.on('mousemove', 'ms-facilities-dot', (e: MapLayerMouseEvent) => {
+      if (isDrawingRef.current) return;
+      map.getCanvas().style.cursor = 'pointer';
+      const feat = e.features?.[0];
+      if (feat?.properties) {
+        const props = feat.properties;
+        const isWh = props.kind === 'warehouse';
+        const balesNum = Number(props.bales || 0);
+        setHoveredParcelInfo({
+          name: String(props.name || ''),
+          subline: `${isWh ? 'Cotton Warehouse' : 'Cotton Gin'} · ${props.city || props.county}, MS · ${balesNum.toLocaleString()} ${isWh ? 'bale cap' : 'est. bales'}`,
+          accent: isWh ? '#5ec8eb' : '#f0bb66',
+          x: e.point.x,
+          y: e.point.y,
+        });
+      }
+    });
+
+    map.on('mouseleave', 'ms-facilities-dot', () => {
+      map.getCanvas().style.cursor = isDrawingRef.current ? 'crosshair' : 'grab';
+      setHoveredParcelInfo(null);
+    });
+
     map.on('mousemove', 'parcels-fill', (e: MapLayerMouseEvent) => {
       if (isDrawingRef.current) {
         map.getCanvas().style.cursor = 'crosshair';
         setHoveredParcelInfo(null);
         return;
       }
+      // Give priority to facilities tooltip if hovering a gin/warehouse directly
+      const facHits = map.queryRenderedFeatures(e.point, { layers: ['ms-facilities-dot'] });
+      if (facHits.length > 0) return;
+
       map.getCanvas().style.cursor = 'pointer';
       const feat = e.features?.[0];
       if (feat?.properties) {
@@ -420,9 +585,8 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
         } else {
           setHoveredParcelInfo({
             name: String(props.name || ''),
-            parno: String(props.parno || ''),
-            acres: Number(props.areaAcres || 0),
-            health: Number(props.healthPct || 88),
+            subline: `${formatArea(Number(props.areaAcres || 0), unit)} · ${Number(props.healthPct || 88)}% Health · Click to inspect`,
+            accent: '#d8f274',
             x: e.point.x,
             y: e.point.y,
           });
@@ -443,9 +607,21 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
         ]);
         return;
       }
+      // Check cotton gins & warehouses first
+      const facHits = map.queryRenderedFeatures(e.point, { layers: ['ms-facilities-dot', 'ms-facilities-halo'] });
+      const clickedFacId = facHits[0]?.properties?.id;
+      if (clickedFacId) {
+        const found = facilitiesRef.current.find((f) => f.id === String(clickedFacId));
+        if (found) {
+          onSelectFacility(found);
+          return;
+        }
+      }
+
       const features = map.queryRenderedFeatures(e.point, { layers: ['parcels-fill'] });
       const clickedId = features[0]?.properties?.id;
       if (clickedId) {
+        onSelectFacility(null);
         onSelectParcel(String(clickedId));
       }
     });
@@ -467,6 +643,64 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
     }
     updateProjectedOverlays();
   }, [parcelsGeoJson, updateProjectedOverlays]);
+
+  // Update Mississippi Cotton Gins & Warehouses GeoJSON + visibility
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReadyRef.current) return;
+    const src = map.getSource('ms-facilities') as GeoJSONSource | undefined;
+    if (src) {
+      src.setData(facilitiesGeoJson as unknown as GeoJSON.FeatureCollection);
+    }
+    const vis = showFacilities ? 'visible' : 'none';
+    ['ms-facilities-halo', 'ms-facilities-dot', 'ms-facilities-core'].forEach((layerId) => {
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, 'visibility', vis);
+      }
+    });
+  }, [facilitiesGeoJson, showFacilities]);
+
+  // Fly to selected Cotton Gin or Cotton Warehouse when clicked/searched
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReadyRef.current || !selectedFacility) return;
+    const isDesktop = window.innerWidth >= 1024;
+    map.flyTo({
+      center: [selectedFacility.lng, selectedFacility.lat],
+      zoom: Math.max(map.getZoom(), 11.4),
+      pitch: is3D ? 42 : 0,
+      bearing: is3D ? -10 : 0,
+      padding: isDesktop
+        ? { left: 365, right: 110, top: 96, bottom: 270 }
+        : { left: 16, right: 16, top: 90, bottom: 180 },
+      duration: 950,
+      essential: true,
+    });
+  }, [selectedFacility, is3D]);
+
+  // Fly out to full Mississippi State view showing all 38 Cotton Gins & 2 Warehouses
+  const prevStatewideTick = useRef(statewideTick);
+  useEffect(() => {
+    if (statewideTick === prevStatewideTick.current) return;
+    prevStatewideTick.current = statewideTick;
+    const map = mapRef.current;
+    if (!map || !mapReadyRef.current) return;
+    const isDesktop = window.innerWidth >= 1024;
+    map.fitBounds(
+      [
+        [-91.35, 32.15],
+        [-88.12, 35.05],
+      ],
+      {
+        pitch: is3D ? 22 : 0,
+        bearing: 0,
+        padding: isDesktop
+          ? { left: 385, right: 155, top: 105, bottom: 268 }
+          : { left: 20, right: 20, top: 100, bottom: 200 },
+        duration: 1100,
+      }
+    );
+  }, [statewideTick, is3D]);
 
   // Update draft polygon GeoJSON when plotting corners
   useEffect(() => {
@@ -632,7 +866,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
         <span className="h-2.5 w-2.5 rounded-full bg-[#f0bb66]" />
       </div>
 
-      {/* Hover Preview Tooltip for Neighboring Como Parcels */}
+      {/* Hover Preview Tooltip for Neighboring Parcels, Gins, & Warehouses */}
       {hoveredParcelInfo && !isDrawingPlot && (
         <div
           className="glass-panel-dense pointer-events-none fixed z-[8] rounded-xl px-3 py-1.5"
@@ -642,12 +876,155 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
           }}
         >
           <div className="text-[12px] font-semibold text-[#f5f7f1]">{hoveredParcelInfo.name}</div>
-          <div className="flex items-center gap-2 font-mono text-[10px] text-[#d8f274]">
-            <span>{formatArea(hoveredParcelInfo.acres, unit)}</span>
-            <span className="text-white/35">·</span>
-            <span>{hoveredParcelInfo.health}% Health</span>
-            <span className="text-white/35">·</span>
-            <span className="text-[#dce2d4]/65">Click to inspect</span>
+          <div
+            className="font-mono text-[10px]"
+            style={{ color: hoveredParcelInfo.accent }}
+          >
+            {hoveredParcelInfo.subline}
+          </div>
+        </div>
+      )}
+
+      {/* Selected Cotton Gin / Warehouse Floating Inspector Card */}
+      {selectedFacility && !isDrawingPlot && (
+        <div className="pointer-events-auto fixed left-1/2 top-24 z-30 w-[92vw] max-w-[390px] -translate-x-1/2 lg:left-[calc(50%+150px)]">
+          <div className="glass-panel-dense rounded-2xl border border-white/15 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                    selectedFacility.kind === 'warehouse'
+                      ? 'bg-[#5ec8eb]/18 text-[#5ec8eb]'
+                      : 'bg-[#f0bb66]/18 text-[#f0bb66]'
+                  }`}
+                >
+                  {selectedFacility.kind === 'warehouse' ? (
+                    <Warehouse size={19} weight="duotone" />
+                  ) : (
+                    <Factory size={19} weight="duotone" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-mono text-[9.5px] font-semibold uppercase ${
+                        selectedFacility.kind === 'warehouse'
+                          ? 'bg-[#5ec8eb]/16 text-[#5ec8eb]'
+                          : 'bg-[#f0bb66]/16 text-[#f0bb66]'
+                      }`}
+                    >
+                      {selectedFacility.kind === 'warehouse' ? 'MS Cotton Warehouse' : 'MS Cotton Gin'}
+                    </span>
+                    {selectedFacility.iceLicensed && (
+                      <span className="rounded-full bg-[#d8f274]/15 px-1.5 py-0.5 font-mono text-[9px] text-[#d8f274]">
+                        ICE
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="mt-1 truncate text-[14.5px] font-semibold text-[#f5f7f1]">
+                    {selectedFacility.name}
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => onSelectFacility(null)}
+                aria-label="Close facility card"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/12 text-[#dce2d4]/75 hover:bg-white/10"
+              >
+                <X size={13} />
+              </button>
+            </div>
+
+            <div className="mt-3 space-y-1.5 rounded-xl bg-white/[0.03] p-2.5 text-[11.5px]">
+              <div className="flex justify-between gap-2">
+                <span className="text-[#dce2d4]/55">Location</span>
+                <span className="text-right text-[#eef2e8]">
+                  {selectedFacility.address || `${selectedFacility.city}, MS`}
+                </span>
+              </div>
+              {selectedFacility.county && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-[#dce2d4]/55">County / Code</span>
+                  <span className="font-mono text-[#dce2d4]/85">
+                    {selectedFacility.county} Co. · #{selectedFacility.code}
+                  </span>
+                </div>
+              )}
+              {selectedFacility.kind === 'gin' && selectedFacility.estBales2024 && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-[#dce2d4]/55">Est. 2024 Ginned</span>
+                  <span className="tabular-nums font-semibold text-[#f0bb66]">
+                    {selectedFacility.estBales2024.toLocaleString()} bales
+                  </span>
+                </div>
+              )}
+              {selectedFacility.kind === 'gin' && selectedFacility.countyYield2024 && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-[#dce2d4]/55">County Avg Yield</span>
+                  <span className="tabular-nums text-[#d8f274]">
+                    {selectedFacility.countyYield2024.toLocaleString()} lbs/ac
+                  </span>
+                </div>
+              )}
+              {selectedFacility.kind === 'warehouse' && selectedFacility.capacityBales && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-[#dce2d4]/55">Storage Capacity</span>
+                  <span className="tabular-nums font-semibold text-[#5ec8eb]">
+                    {selectedFacility.capacityBales.toLocaleString()} bales
+                  </span>
+                </div>
+              )}
+              {selectedFacility.phone && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-[#dce2d4]/55">Phone</span>
+                  <span className="font-mono text-[#eef2e8]">{selectedFacility.phone}</span>
+                </div>
+              )}
+              <div className="flex justify-between gap-2">
+                <span className="text-[#dce2d4]/55">GPS</span>
+                <span className="font-mono text-[#dce2d4]/75">
+                  {selectedFacility.lat.toFixed(4)}°N, {Math.abs(selectedFacility.lng).toFixed(4)}°W
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const map = mapRef.current;
+                  const isDesktop = window.innerWidth >= 1024;
+                  const layerId: 1 | 2 = selectedFacility.lng < -89.65 ? 1 : 2;
+                  const dLng = 0.045;
+                  const dLat = 0.032;
+                  map?.flyTo({
+                    center: [selectedFacility.lng, selectedFacility.lat],
+                    zoom: 13.0,
+                    pitch: is3D ? 48 : 0,
+                    bearing: is3D ? -14 : 0,
+                    padding: isDesktop
+                      ? { left: 365, right: 110, top: 96, bottom: 265 }
+                      : { left: 16, right: 16, top: 90, bottom: 180 },
+                    duration: 900,
+                  });
+                  onSyncMarisBounds(
+                    {
+                      west: Number((selectedFacility.lng - dLng).toFixed(4)),
+                      south: Number((selectedFacility.lat - dLat).toFixed(4)),
+                      east: Number((selectedFacility.lng + dLng).toFixed(4)),
+                      north: Number((selectedFacility.lat + dLat).toFixed(4)),
+                    },
+                    layerId
+                  );
+                }}
+                disabled={isSyncingMaris}
+                className="flex items-center gap-1.5 rounded-full bg-[#d8f274] px-3.5 py-1.5 text-[11.5px] font-semibold text-[#141710] transition-opacity hover:bg-[#e5fa93] disabled:opacity-50"
+              >
+                <MapPinArea size={14} weight="bold" />
+                <span>{isSyncingMaris ? 'Loading Parcels...' : 'Load Surrounding MARIS Parcels'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -773,6 +1150,24 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
             </button>
           );
         })}
+
+        {/* Mississippi Cotton Gins & Warehouses Layer Toggle */}
+        <button
+          type="button"
+          onClick={onToggleFacilities}
+          title="Toggle all 38 Mississippi Cotton Gins (amber) and 2 Cotton Warehouses (cyan)"
+          className={`glass-pill mt-0.5 flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium transition-all ${
+            showFacilities
+              ? 'border-[#f0bb66]/55 bg-[#201e17]/92 text-[#f6deb2]'
+              : 'text-[#dce2d4]/60 hover:border-white/25 hover:text-white'
+          }`}
+        >
+          <span className="flex items-center gap-1">
+            <span className="h-2 w-2 rounded-full bg-[#f0bb66]" />
+            <span className="h-2 w-2 rounded-full bg-[#5ec8eb]" />
+          </span>
+          <span>Gins &amp; WH ({facilities.length})</span>
+        </button>
 
         {/* Live MARIS Statewide GIS Pull Button */}
         <button

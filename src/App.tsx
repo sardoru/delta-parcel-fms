@@ -7,6 +7,7 @@ import {
 import { MS_REGIONS } from './data/regions';
 import {
   AreaUnit,
+  CottonFacility,
   EquipmentUnit,
   FieldLogEntry,
   GeoGeometry,
@@ -62,6 +63,11 @@ export function App() {
 
   const [regionCache, setRegionCache] = useState<Partial<Record<RegionId, Parcel[]>>>({});
   const [parcels, setParcels] = useState<Parcel[]>([]);
+  const [facilities, setFacilities] = useState<CottonFacility[]>([]);
+  const [selectedFacility, setSelectedFacility] = useState<CottonFacility | null>(null);
+  const [showFacilities, setShowFacilities] = useState(true);
+  const [isStatewideView, setIsStatewideView] = useState(false);
+  const [statewideTick, setStatewideTick] = useState(0);
   const [loadingParcels, setLoadingParcels] = useState(true);
   const [equipmentByRegion, setEquipmentByRegion] =
     useState<Record<RegionId, EquipmentUnit[]>>(REGION_EQUIPMENT);
@@ -80,6 +86,16 @@ export function App() {
 
   const cacheRef = useRef(regionCache);
   cacheRef.current = regionCache;
+
+  // Load all 38 Mississippi Cotton Gins & 2 Mississippi Cotton Warehouses (from cotton-gin-map.vercel.app)
+  useEffect(() => {
+    fetch('/data/ms-cotton-facilities.json')
+      .then((r) => r.json())
+      .then((d: { all?: CottonFacility[] }) => {
+        if (Array.isArray(d?.all)) setFacilities(d.all);
+      })
+      .catch(() => {});
+  }, []);
 
   // Load 120 official MARIS 2024 parcels for the active Mississippi region (Macon / Como)
   useEffect(() => {
@@ -179,12 +195,16 @@ export function App() {
     [regionId]
   );
 
-  // Live query official Mississippi MARIS 2024 Cadastral ArcGIS Server (East Layer 2 for Macon, West Layer 1 for Como)
+  // Live query official Mississippi MARIS 2024 Cadastral ArcGIS Server (East Layer 2 or West Layer 1)
   const handleSyncMarisBounds = useCallback(
-    async (bounds: { west: number; south: number; east: number; north: number }) => {
+    async (
+      bounds: { west: number; south: number; east: number; north: number },
+      overrideLayerId?: 1 | 2
+    ) => {
       setIsSyncingMaris(true);
       setMarisSyncMessage(null);
       try {
+        const layerId = overrideLayerId ?? region.marisLayerId;
         const params = new URLSearchParams({
           geometry: `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`,
           geometryType: 'esriGeometryEnvelope',
@@ -196,7 +216,7 @@ export function App() {
           outSR: '4326',
           f: 'geojson',
         });
-        const url = `https://gis.mississippi.edu/server/rest/services/Cadastral/MS_Parcels_August_2024/MapServer/${region.marisLayerId}/query?${params.toString()}`;
+        const url = `https://gis.mississippi.edu/server/rest/services/Cadastral/MS_Parcels_August_2024/MapServer/${layerId}/query?${params.toString()}`;
         const res = await fetch(url);
         const fc = await res.json();
         const incoming: Parcel[] = (fc.features || [])
@@ -382,22 +402,32 @@ export function App() {
 
   return (
     <div className="relative min-h-[100dvh] w-full overflow-x-hidden bg-[#10130f]">
-      {/* Real 3D-Tilted MapLibre Satellite Stage with Official MARIS 2024 Parcels */}
+      {/* Real 3D-Tilted MapLibre Satellite Stage with Official MARIS 2024 Parcels + 40 MS Gins/Warehouses */}
       <ParcelMapStage
         region={region}
         parcels={parcels}
+        facilities={facilities}
         selectedParcel={selectedParcel}
+        selectedFacility={selectedFacility}
+        statewideTick={statewideTick}
         activeLayer={activeLayer}
+        showFacilities={showFacilities}
         unit={unit}
         hoveredStressCell={hoveredStressCell}
         isDrawingPlot={isDrawingPlot}
         isSyncingMaris={isSyncingMaris}
         marisSyncMessage={marisSyncMessage}
         onSelectParcel={(id) => {
+          setIsStatewideView(false);
           setSelectedParcelId(id);
           setHoveredStressCell(null);
         }}
+        onSelectFacility={(fac) => {
+          setSelectedFacility(fac);
+          if (fac) setShowFacilities(true);
+        }}
         onChangeLayer={setActiveLayer}
+        onToggleFacilities={() => setShowFacilities((v) => !v)}
         onOpenParcelDetail={() => setParcelDetailOpen(true)}
         onSyncMarisBounds={handleSyncMarisBounds}
         onFinishDrawPlot={handleFinishDrawPlot}
@@ -423,8 +453,20 @@ export function App() {
         <div className="order-1 flex w-full min-w-0 max-w-full flex-1 flex-col justify-between gap-3 lg:order-2">
           <TopHudBar
             region={region}
-            onChangeRegion={setRegionId}
+            isStatewideView={isStatewideView}
+            onChangeRegion={(rid) => {
+              setIsStatewideView(false);
+              setSelectedFacility(null);
+              setRegionId(rid);
+            }}
+            onViewAllMS={() => {
+              setShowFacilities(true);
+              setSelectedFacility(null);
+              setIsStatewideView(true);
+              setStatewideTick((t) => t + 1);
+            }}
             parcels={parcels}
+            facilities={facilities}
             equipment={equipment}
             selectedParcel={selectedParcel}
             alerts={alerts}
@@ -432,8 +474,14 @@ export function App() {
             unit={unit}
             onToggleUnit={() => setUnit((u) => (u === 'ac' ? 'ha' : 'ac'))}
             onSelectParcel={(id) => {
+              setIsStatewideView(false);
+              setSelectedFacility(null);
               setSelectedParcelId(id);
               setHoveredStressCell(null);
+            }}
+            onSelectFacility={(fac) => {
+              setShowFacilities(true);
+              setSelectedFacility(fac);
             }}
             onSelectEquipment={(eqId) => setInspectedEquipmentId(eqId)}
             isDrawingPlot={isDrawingPlot}

@@ -3,6 +3,7 @@ import {
   Bell,
   CloudSun,
   Drop,
+  Factory,
   MagnifyingGlass,
   Plus,
   WarningCircle,
@@ -13,9 +14,11 @@ import {
   X,
   MapPinArea,
   Tractor,
+  Warehouse,
 } from '@phosphor-icons/react';
 import {
   AreaUnit,
+  CottonFacility,
   DeltaAlert,
   EquipmentUnit,
   LiveWeather,
@@ -28,8 +31,11 @@ import { formatArea, formatTemp, formatWind } from '../utils/units';
 
 interface TopHudBarProps {
   region: RegionConfig;
+  isStatewideView: boolean;
   onChangeRegion: (id: RegionId) => void;
+  onViewAllMS: () => void;
   parcels: Parcel[];
+  facilities: CottonFacility[];
   equipment: EquipmentUnit[];
   selectedParcel: Parcel;
   alerts: DeltaAlert[];
@@ -37,6 +43,7 @@ interface TopHudBarProps {
   unit: AreaUnit;
   onToggleUnit: () => void;
   onSelectParcel: (parcelId: string) => void;
+  onSelectFacility: (facility: CottonFacility) => void;
   onSelectEquipment: (eqId: string) => void;
   isDrawingPlot: boolean;
   onToggleDrawPlot: () => void;
@@ -44,8 +51,11 @@ interface TopHudBarProps {
 
 export const TopHudBar: React.FC<TopHudBarProps> = ({
   region,
+  isStatewideView,
   onChangeRegion,
+  onViewAllMS,
   parcels,
+  facilities,
   equipment,
   selectedParcel,
   alerts,
@@ -53,6 +63,7 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
   unit,
   onToggleUnit,
   onSelectParcel,
+  onSelectFacility,
   onSelectEquipment,
   isDrawingPlot,
   onToggleDrawPlot,
@@ -83,7 +94,13 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
 
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return { parcels: parcels.slice(0, 8), equipment };
+    if (!q) {
+      return {
+        parcels: parcels.slice(0, 5),
+        facilities: facilities.slice(0, 5),
+        equipment,
+      };
+    }
     return {
       parcels: parcels
         .filter(
@@ -96,7 +113,17 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
             p.county.toLowerCase().includes(q) ||
             p.soilSeries.toLowerCase().includes(q)
         )
-        .slice(0, 10),
+        .slice(0, 6),
+      facilities: facilities
+        .filter(
+          (f) =>
+            f.name.toLowerCase().includes(q) ||
+            f.city.toLowerCase().includes(q) ||
+            f.county.toLowerCase().includes(q) ||
+            f.address.toLowerCase().includes(q) ||
+            f.kind.includes(q)
+        )
+        .slice(0, 8),
       equipment: equipment.filter(
         (eq) =>
           eq.name.toLowerCase().includes(q) ||
@@ -104,7 +131,7 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
           eq.operator.toLowerCase().includes(q)
       ),
     };
-  }, [searchQuery, parcels, equipment]);
+  }, [searchQuery, parcels, facilities, equipment]);
 
   return (
     <header className="pointer-events-none flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
@@ -115,14 +142,14 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
             {region.title}
           </h1>
 
-          {/* Mississippi Basin Switcher (Macon / Bogue Chitto Gin ↔ Como / Panola) */}
+          {/* Mississippi Basin Switcher (Macon / Bogue Chitto Gin ↔ Como / Panola ↔ All MS Gins) */}
           <div
             role="tablist"
             aria-label="Switch Mississippi farm basin"
             className="glass-pill inline-flex shrink-0 items-center rounded-full p-0.5 text-[11px]"
           >
             {(['macon', 'como'] as RegionId[]).map((rid) => {
-              const active = region.id === rid;
+              const active = !isStatewideView && region.id === rid;
               return (
                 <button
                   key={rid}
@@ -140,6 +167,19 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
                 </button>
               );
             })}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={isStatewideView}
+              onClick={onViewAllMS}
+              className={`rounded-full px-2.5 py-1 font-medium transition-all ${
+                isStatewideView
+                  ? 'bg-[#f0bb66] text-[#141710] shadow-sm'
+                  : 'text-[#f0bb66]/85 hover:text-[#f6deb2]'
+              }`}
+            >
+              All MS Gins ({facilities.length})
+            </button>
           </div>
         </div>
 
@@ -249,6 +289,52 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
                     </button>
                   ))}
                 </div>
+              )}
+
+              {searchResults.facilities.length > 0 && (
+                <>
+                  <div className="mt-1.5 border-t border-white/8 px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-[#f0bb66]/75">
+                    MS Cotton Gins &amp; Warehouses ({searchResults.facilities.length})
+                  </div>
+                  <div className="max-h-[190px] overflow-y-auto">
+                    {searchResults.facilities.map((fac) => (
+                      <button
+                        key={fac.id}
+                        type="button"
+                        onClick={() => {
+                          onSelectFacility(fac);
+                          setSearchOpen(false);
+                          setSearchQuery('');
+                        }}
+                        className="flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left hover:bg-white/7"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          {fac.kind === 'warehouse' ? (
+                            <Warehouse size={14} className="shrink-0 text-[#5ec8eb]" />
+                          ) : (
+                            <Factory size={14} className="shrink-0 text-[#f0bb66]" />
+                          )}
+                          <div className="min-w-0">
+                            <div className="truncate text-[12px] font-medium text-[#f3f5ef]">
+                              {fac.name}
+                            </div>
+                            <div className="truncate text-[10px] text-[#dce2d4]/55">
+                              {fac.city || fac.county}, MS ·{' '}
+                              {fac.kind === 'warehouse' ? 'Warehouse' : 'Cotton Gin'}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="shrink-0 font-mono text-[10px] text-[#dce2d4]/65">
+                          {fac.kind === 'warehouse' && fac.capacityBales
+                            ? `${Math.round(fac.capacityBales / 1000)}k cap`
+                            : fac.estBales2024
+                            ? `${Math.round(fac.estBales2024 / 1000)}k`
+                            : 'MS'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
 
               {searchResults.equipment.length > 0 && (
