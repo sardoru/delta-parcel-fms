@@ -58,7 +58,13 @@ interface ParcelMapStageProps {
   onOpenParcelDetail: () => void;
   onSyncMarisBounds: (
     bounds: { west: number; south: number; east: number; north: number },
-    overrideLayerId?: 1 | 2
+    options?: {
+      stateHint?: string;
+      landmarkName?: string;
+      landmarkLat?: number;
+      landmarkLng?: number;
+      overrideMsLayerId?: 1 | 2;
+    }
   ) => void;
   onFinishDrawPlot: (payload: {
     name: string;
@@ -204,6 +210,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
         properties: {
           id: p.id,
           name: p.name,
+          ownerName: p.ownerName,
           parno: p.parno,
           areaAcres: p.areaAcres,
           healthPct: p.healthPct,
@@ -604,7 +611,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
         } else {
           setHoveredParcelInfo({
             name: String(props.name || ''),
-            subline: `${formatArea(Number(props.areaAcres || 0), unit)} · ${Number(props.healthPct || 88)}% Health · Click to inspect`,
+            subline: `${props.ownerName ? `${props.ownerName} · ` : ''}${formatArea(Number(props.areaAcres || 0), unit)} · ${Number(props.healthPct || 88)}% Health`,
             accent: '#d8f274',
             x: e.point.x,
             y: e.point.y,
@@ -860,12 +867,47 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
     const map = mapRef.current;
     if (!map) return;
     const b = map.getBounds();
-    onSyncMarisBounds({
-      west: Number(b.getWest().toFixed(4)),
-      south: Number(b.getSouth().toFixed(4)),
-      east: Number(b.getEast().toFixed(4)),
-      north: Number(b.getNorth().toFixed(4)),
-    });
+    const spanLng = b.getEast() - b.getWest();
+    const spanLat = b.getNorth() - b.getSouth();
+    // If zoomed way out, query a focused ~5mi agricultural box around the current center or selected facility
+    if (spanLng > 0.25 || spanLat > 0.2) {
+      const center = selectedFacility
+        ? { lng: selectedFacility.lng, lat: selectedFacility.lat }
+        : map.getCenter();
+      onSyncMarisBounds(
+        {
+          west: Number((center.lng - 0.055).toFixed(4)),
+          south: Number((center.lat - 0.042).toFixed(4)),
+          east: Number((center.lng + 0.055).toFixed(4)),
+          north: Number((center.lat + 0.042).toFixed(4)),
+        },
+        selectedFacility
+          ? {
+              stateHint: selectedFacility.state,
+              landmarkName: selectedFacility.name,
+              landmarkLat: selectedFacility.lat,
+              landmarkLng: selectedFacility.lng,
+            }
+          : undefined
+      );
+      return;
+    }
+    onSyncMarisBounds(
+      {
+        west: Number(b.getWest().toFixed(4)),
+        south: Number(b.getSouth().toFixed(4)),
+        east: Number(b.getEast().toFixed(4)),
+        north: Number(b.getNorth().toFixed(4)),
+      },
+      selectedFacility
+        ? {
+            stateHint: selectedFacility.state,
+            landmarkName: selectedFacility.name,
+            landmarkLat: selectedFacility.lat,
+            landmarkLng: selectedFacility.lng,
+          }
+        : undefined
+    );
   };
 
   const handleSaveDraft = (e: React.FormEvent) => {
@@ -1051,65 +1093,73 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
               </div>
             </div>
 
-            <div className="mt-3 flex items-center justify-end gap-2">
-              {selectedFacility.state === 'MS' ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const map = mapRef.current;
-                    const isDesktop = window.innerWidth >= 1024;
-                    const layerId: 1 | 2 = selectedFacility.lng < -89.65 ? 1 : 2;
-                    const dLng = 0.045;
-                    const dLat = 0.032;
-                    map?.flyTo({
-                      center: [selectedFacility.lng, selectedFacility.lat],
-                      zoom: 13.0,
-                      pitch: is3D ? 48 : 0,
-                      bearing: is3D ? -14 : 0,
-                      padding: isDesktop
-                        ? { left: 365, right: 110, top: 96, bottom: 265 }
-                        : { left: 16, right: 16, top: 90, bottom: 180 },
-                      duration: 900,
-                    });
-                    onSyncMarisBounds(
-                      {
-                        west: Number((selectedFacility.lng - dLng).toFixed(4)),
-                        south: Number((selectedFacility.lat - dLat).toFixed(4)),
-                        east: Number((selectedFacility.lng + dLng).toFixed(4)),
-                        north: Number((selectedFacility.lat + dLat).toFixed(4)),
-                      },
-                      layerId
-                    );
-                  }}
-                  disabled={isSyncingMaris}
-                  className="flex items-center gap-1.5 rounded-full bg-[#d8f274] px-3.5 py-1.5 text-[11.5px] font-semibold text-[#141710] transition-opacity hover:bg-[#e5fa93] disabled:opacity-50"
-                >
-                  <MapPinArea size={14} weight="bold" />
-                  <span>{isSyncingMaris ? 'Loading Parcels...' : 'Load Surrounding MARIS Parcels'}</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const map = mapRef.current;
-                    const isDesktop = window.innerWidth >= 1024;
-                    map?.flyTo({
-                      center: [selectedFacility.lng, selectedFacility.lat],
-                      zoom: 14.5,
-                      pitch: is3D ? 48 : 0,
-                      bearing: is3D ? -12 : 0,
-                      padding: isDesktop
-                        ? { left: 365, right: 110, top: 96, bottom: 265 }
-                        : { left: 16, right: 16, top: 90, bottom: 180 },
-                      duration: 950,
-                    });
-                  }}
-                  className="flex items-center gap-1.5 rounded-full bg-[#d8f274] px-3.5 py-1.5 text-[11.5px] font-semibold text-[#141710] transition-opacity hover:bg-[#e5fa93]"
-                >
-                  <MapPinArea size={14} weight="bold" />
-                  <span>Zoom to Aerial View</span>
-                </button>
-              )}
+            <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const map = mapRef.current;
+                  const isDesktop = window.innerWidth >= 1024;
+                  map?.flyTo({
+                    center: [selectedFacility.lng, selectedFacility.lat],
+                    zoom: 15.2,
+                    pitch: is3D ? 48 : 0,
+                    bearing: is3D ? -12 : 0,
+                    padding: isDesktop
+                      ? { left: 365, right: 110, top: 96, bottom: 265 }
+                      : { left: 16, right: 16, top: 90, bottom: 180 },
+                    duration: 850,
+                  });
+                }}
+                className="flex items-center gap-1 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[11px] font-medium text-[#eef2e8] transition-colors hover:border-white/30 hover:bg-white/12"
+              >
+                <span>Aerial Zoom</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const map = mapRef.current;
+                  const isDesktop = window.innerWidth >= 1024;
+                  const layerId: 1 | 2 = selectedFacility.lng < -89.65 ? 1 : 2;
+                  const dLng = 0.055;
+                  const dLat = 0.042;
+                  map?.flyTo({
+                    center: [selectedFacility.lng, selectedFacility.lat],
+                    zoom: 12.85,
+                    pitch: is3D ? 48 : 0,
+                    bearing: is3D ? -14 : 0,
+                    padding: isDesktop
+                      ? { left: 365, right: 110, top: 96, bottom: 265 }
+                      : { left: 16, right: 16, top: 90, bottom: 180 },
+                    duration: 900,
+                  });
+                  onSyncMarisBounds(
+                    {
+                      west: Number((selectedFacility.lng - dLng).toFixed(4)),
+                      south: Number((selectedFacility.lat - dLat).toFixed(4)),
+                      east: Number((selectedFacility.lng + dLng).toFixed(4)),
+                      north: Number((selectedFacility.lat + dLat).toFixed(4)),
+                    },
+                    {
+                      stateHint: selectedFacility.state,
+                      landmarkName: selectedFacility.name,
+                      landmarkLat: selectedFacility.lat,
+                      landmarkLng: selectedFacility.lng,
+                      overrideMsLayerId: selectedFacility.state === 'MS' ? layerId : undefined,
+                    }
+                  );
+                }}
+                disabled={isSyncingMaris}
+                className="flex items-center gap-1.5 rounded-full bg-[#d8f274] px-3.5 py-1.5 text-[11.5px] font-semibold text-[#141710] transition-opacity hover:bg-[#e5fa93] disabled:opacity-50"
+              >
+                <MapPinArea size={14} weight="bold" />
+                <span>
+                  {isSyncingMaris
+                    ? 'Syncing Nearby Parcels...'
+                    : selectedFacility.state === 'MS'
+                    ? 'Sync Nearby MARIS GIS Parcel Plots'
+                    : `Sync Nearby ${selectedFacility.state} GIS Parcel Plots`}
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -1163,6 +1213,11 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
             <div className="whitespace-nowrap text-[12.5px] font-semibold leading-tight text-[#f5f7f1]">
               {selectedParcel.name}
             </div>
+            {selectedParcel.ownerName && (
+              <div className="max-w-[230px] truncate text-[10px] font-medium text-[#d8f274]/85">
+                {selectedParcel.ownerName}
+              </div>
+            )}
             <div className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-[10.5px]">
               <span className="tabular-nums text-[#dce2d4]/75">
                 {selectedParcel.healthPct}% Health
@@ -1272,20 +1327,20 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
           </button>
         )}
 
-        {/* Live MARIS Statewide GIS Pull Button */}
+        {/* Live Statewide GIS Parcel Pull Button (MARIS MS / AR GIS / TX StratMap / NC OneMap) */}
         <button
           type="button"
           onClick={handleTriggerMarisSync}
           disabled={isSyncingMaris}
-          title="Query live Mississippi MARIS 2024 cadastral parcels for the current map view"
+          title="Sync real nearby farm parcel plots & county ownership (MARIS MS, AR GIS, TX StratMap, NC OneMap)"
           className="glass-pill mt-1 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium text-[#d8f274] transition-colors hover:border-[#d8f274]/55 hover:bg-[#1f241b]/95 disabled:opacity-60"
         >
           <ArrowsClockwise size={13} className={isSyncingMaris ? 'animate-spin' : ''} />
-          <span>{isSyncingMaris ? 'Syncing GIS...' : 'Sync MARIS GIS'}</span>
+          <span>{isSyncingMaris ? 'Syncing GIS...' : 'Sync Nearby GIS'}</span>
         </button>
 
         {marisSyncMessage && (
-          <div className="glass-panel max-w-[175px] rounded-xl px-2.5 py-1.5 text-right text-[10px] leading-snug text-[#dce2d4]/85">
+          <div className="glass-panel max-w-[210px] rounded-xl px-2.5 py-1.5 text-right text-[10px] leading-snug text-[#dce2d4]/88">
             {marisSyncMessage}
           </div>
         )}

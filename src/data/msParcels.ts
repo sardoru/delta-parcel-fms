@@ -203,16 +203,45 @@ const FEATURED_NAMES: Record<
   },
 };
 
+function formatOwnerTitleCase(raw?: string): string {
+  const cleaned = String(raw || '').replace(/\s+/g, ' ').trim();
+  if (!cleaned || cleaned === '0' || cleaned.toUpperCase() === 'UNKNOWN') {
+    return 'County Record Unlisted';
+  }
+  const keepUpper = new Set(['LLC', 'LLP', 'LP', 'INC', 'CO', 'ETAL', 'ETUX', 'II', 'III', 'IV', 'JR', 'SR']);
+  return cleaned
+    .toLowerCase()
+    .split(' ')
+    .map((w) => {
+      const bare = w.toUpperCase().replace(/[^A-Z]/g, '');
+      if (keepUpper.has(bare)) return w.toUpperCase();
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    })
+    .join(' ');
+}
+
 function deriveParcelLabel(p: RawMarisProperties, regionId: RegionId): string {
-  const featured = FEATURED_NAMES[regionId][p.parno];
-  if (featured) return featured.name;
+  const stateCode = (p.stateCode || 'MS').toUpperCase();
+  if (stateCode === 'MS') {
+    const featured = FEATURED_NAMES[regionId][p.parno];
+    if (featured) return featured.name;
+  }
 
   if (p.siteadd && p.siteadd !== '0' && !p.siteadd.startsWith('0 ') && p.siteadd.length > 4) {
     const cleanRoad = p.siteadd
       .replace(/^\d+\s+/, '')
       .toLowerCase()
       .replace(/\b\w/g, (c) => c.toUpperCase());
-    return `${cleanRoad} · Sec ${p.section || '01'}`;
+    return p.section ? `${cleanRoad} · Sec ${p.section}` : cleanRoad;
+  }
+
+  if (stateCode !== 'MS') {
+    const ownerShort = formatOwnerTitleCase(p.ownname).split(' ').slice(0, 2).join(' ');
+    if (ownerShort && ownerShort !== 'County Record') {
+      return p.section ? `${ownerShort} · Sec ${p.section}` : `${ownerShort} Tract`;
+    }
+    const cnty = p.cntyname ? p.cntyname[0] + p.cntyname.slice(1).toLowerCase() : stateCode;
+    return p.section ? `${cnty} Farm · Sec ${p.section}` : `${cnty} Parcel ${p.parno.slice(-5)}`;
   }
 
   if (regionId === 'macon') {
@@ -409,10 +438,6 @@ export function hydrateMarisFeature(
       ? 'Monitor Moisture'
       : 'Check Clay Drain';
 
-  const distToGin = cfg.landmark
-    ? haversineMiles(p.lat, p.lng, cfg.landmark.lat, cfg.landmark.lng)
-    : undefined;
-
   const liveYieldLbs = Math.round(cultivatedAcres * cropObj.yieldPerAcreLbs * 0.085);
   const peakIdx = 16 + (seed % 5);
   const yieldBars = Array.from({ length: 24 }, (_, idx) => {
@@ -421,20 +446,38 @@ export function hydrateMarisFeature(
     return 18 + ((seed + idx * 13) % 24);
   });
 
-  const cityLabel = regionId === 'macon' ? `Macon, MS ${p.szip || '39341'}` : `Como, MS ${p.szip || '38619'}`;
+  const stateCode = (p.stateCode || 'MS').toUpperCase();
+  const ownerName = formatOwnerTitleCase(p.ownname);
+  const countyClean = p.cntyname
+    ? p.cntyname
+        .toLowerCase()
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+    : cfg.countyLabel.split(' ')[0];
+  const cityLabel =
+    stateCode === 'MS'
+      ? regionId === 'macon'
+        ? `Macon, MS ${p.szip || '39341'}`
+        : `Como, MS ${p.szip || '38619'}`
+      : `${countyClean} Co., ${stateCode} ${p.szip || ''}`.trim();
   const cleanSite =
     p.siteadd && p.siteadd !== '0' && !p.siteadd.startsWith('0 ')
-      ? `${p.siteadd}, ${regionId === 'macon' ? 'Macon, MS' : 'Como, MS'}`
+      ? `${p.siteadd}, ${stateCode === 'MS' ? (regionId === 'macon' ? 'Macon, MS' : 'Como, MS') : `${countyClean} Co., ${stateCode}`}`
       : p.siteadd?.startsWith('0 ')
-      ? `${p.siteadd.slice(2)}, ${regionId === 'macon' ? 'Macon, MS' : 'Como, MS'}`
+      ? `${p.siteadd.slice(2)}, ${stateCode === 'MS' ? (regionId === 'macon' ? 'Macon, MS' : 'Como, MS') : `${countyClean} Co., ${stateCode}`}`
       : `Rural Route · ${plss}`;
 
+  const distToGin =
+    stateCode === 'MS' && cfg.landmark
+      ? haversineMiles(p.lat, p.lng, cfg.landmark.lat, cfg.landmark.lng)
+      : undefined;
+
   return {
-    id: `${regionId}-${p.parno.replace(/\s+/g, '-')}`,
+    id: `${stateCode === 'MS' ? regionId : stateCode.toLowerCase()}-${p.parno.replace(/\s+/g, '-')}`,
     name,
     parno: p.parno,
     fsaTract: `PARNO ${p.parno}`,
-    county: `${p.cntyname ? p.cntyname[0] + p.cntyname.slice(1).toLowerCase() : cfg.countyLabel.split(' ')[0]} County, MS`,
+    ownerName,
+    county: `${countyClean} County, ${stateCode}`,
     cityState: cityLabel,
     siteAddress: cleanSite,
     plss,

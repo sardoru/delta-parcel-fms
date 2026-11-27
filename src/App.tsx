@@ -2,9 +2,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   hydrateMarisFeature,
   REGION_ALERTS,
-  REGION_EQUIPMENT,
 } from './data/msParcels';
+import {
+  buildEquipmentForParcel,
+  EQUIPMENT_CATALOG,
+  ParcelEquipmentOverride,
+} from './data/equipmentCatalog';
 import { MS_REGIONS } from './data/regions';
+import { fetchRealParcelsInBounds } from './utils/parcelGisSync';
 import {
   AreaUnit,
   CottonFacility,
@@ -72,8 +77,9 @@ export function App() {
   const [statewideTick, setStatewideTick] = useState(0);
   const [nationwideTick, setNationwideTick] = useState(0);
   const [loadingParcels, setLoadingParcels] = useState(true);
-  const [equipmentByRegion, setEquipmentByRegion] =
-    useState<Record<RegionId, EquipmentUnit[]>>(REGION_EQUIPMENT);
+  const [equipmentOverrides, setEquipmentOverrides] = useState<
+    Record<string, ParcelEquipmentOverride>
+  >({});
   const [selectedParcelId, setSelectedParcelId] = useState<string>(MS_REGIONS.macon.defaultParcelId);
   const [activeLayer, setActiveLayer] = useState<MapLayer>('satellite');
   const [unit, setUnit] = useState<AreaUnit>('ac');
@@ -181,13 +187,18 @@ export function App() {
     };
   }, [region.weatherLat, region.weatherLng]);
 
-  const equipment = equipmentByRegion[regionId];
   const alerts = REGION_ALERTS[regionId];
 
   const selectedParcel = useMemo(
     () => parcels.find((p) => p.id === selectedParcelId) ?? parcels[0],
     [parcels, selectedParcelId]
   );
+
+  // Dynamically derive real, changeable Tractor/Harvester & Sprayer units bound to the selected parcel!
+  const equipment = useMemo<EquipmentUnit[]>(() => {
+    if (!selectedParcel) return [];
+    return buildEquipmentForParcel(selectedParcel, equipmentOverrides[selectedParcel.id]);
+  }, [selectedParcel, equipmentOverrides]);
 
   const inspectedEquipment = useMemo(
     () => equipment.find((e) => e.id === inspectedEquipmentId) ?? null,
@@ -205,81 +216,51 @@ export function App() {
     [regionId]
   );
 
-  // Live query official Mississippi MARIS 2024 Cadastral ArcGIS Server (East Layer 2 or West Layer 1)
+  // Live query official statewide Cadastral GIS (MS MARIS 2024, AR GIS, TX StratMap, NC OneMap) with county ownership!
   const handleSyncMarisBounds = useCallback(
     async (
       bounds: { west: number; south: number; east: number; north: number },
-      overrideLayerId?: 1 | 2
+      options?: {
+        stateHint?: string;
+        landmarkName?: string;
+        landmarkLat?: number;
+        landmarkLng?: number;
+        overrideMsLayerId?: 1 | 2;
+      }
     ) => {
       setIsSyncingMaris(true);
       setMarisSyncMessage(null);
       try {
-        const layerId = overrideLayerId ?? region.marisLayerId;
-        const params = new URLSearchParams({
-          geometry: `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`,
-          geometryType: 'esriGeometryEnvelope',
-          inSR: '4326',
-          spatialRel: 'esriSpatialRelIntersects',
-          where: 'CULT_AC1 >= 25 OR GISACRES >= 50',
-          outFields:
-            'PARNO,TAXMAP,SECTION,TWSP,RANGE,SITEADD,SZIP,TAXACRES,GISACRES,CULT_AC1,CULT_AC2,UNCULT_AC1,LEGLDESC,CNTYNAME,LATDEC,LONGDEC,TAXYEAR,LANDVAL,TOTVAL',
-          outSR: '4326',
-          f: 'geojson',
+        const result = await fetchRealParcelsInBounds(bounds, {
+          regionId,
+          stateHint: options?.stateHint,
+          landmarkName: options?.landmarkName,
+          landmarkLat: options?.landmarkLat,
+          landmarkLng: options?.landmarkLng,
+          overrideMsLayerId: options?.overrideMsLayerId,
         });
-        const url = `https://gis.mississippi.edu/server/rest/services/Cadastral/MS_Parcels_August_2024/MapServer/${layerId}/query?${params.toString()}`;
-        const res = await fetch(url);
-        const fc = await res.json();
-        const incoming: Parcel[] = (fc.features || [])
-          .filter(
-            (f: { geometry?: { type: string } }) =>
-              f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon')
-          )
-          .slice(0, 80)
-          .map((f: { properties: Record<string, unknown>; geometry: GeoGeometry }) => {
-            const p = f.properties;
-            const rawProps: RawMarisProperties = {
-              parno: String(p.PARNO || '').replace(/\s+/g, ' ').trim(),
-              taxmap: String(p.TAXMAP || '').trim(),
-              section: String(p.SECTION || '').trim(),
-              twsp: String(p.TWSP || '').trim(),
-              range: String(p.RANGE || '').trim(),
-              siteadd: String(p.SITEADD || '').trim(),
-              szip: String(p.SZIP || region.zip).trim(),
-              gisAcres: Number(Number(p.GISACRES || 0).toFixed(1)),
-              taxAcres: Number(Number(p.TAXACRES || 0).toFixed(1)),
-              cultAcres: Number((Number(p.CULT_AC1 || 0) + Number(p.CULT_AC2 || 0)).toFixed(1)),
-              uncultAcres: Number(Number(p.UNCULT_AC1 || 0).toFixed(1)),
-              legldesc: String(p.LEGLDESC || '').replace(/\s+/g, ' ').trim(),
-              cntyname: String(p.CNTYNAME || region.countyLabel.split(' ')[0].toUpperCase()).trim(),
-              lat: Number(p.LATDEC || region.weatherLat),
-              lng: Number(p.LONGDEC || region.weatherLng),
-              taxyear: String(p.TAXYEAR || '2024').trim(),
-              landVal: Number(p.LANDVAL || 0),
-              totVal: Number(p.TOTVAL || 0),
-            };
-            return hydrateMarisFeature({ properties: rawProps, geometry: f.geometry }, regionId, 'MARIS Live');
+
+        if (result.parcels.length > 0) {
+          updateParcels((prev) => {
+            const existingMap = new Map(prev.map((x) => [x.id, x]));
+            for (const p of result.parcels) {
+              existingMap.set(p.id, p);
+            }
+            return Array.from(existingMap.values());
           });
+          // Select the nearest synced farm parcel so the Left Rail, Map Callout & Bottom HUD update immediately!
+          setSelectedParcelId(result.parcels[0].id);
+          setHoveredStressCell(null);
+        }
 
-        let addedCount = 0;
-        updateParcels((prev) => {
-          const existingIds = new Set(prev.map((x) => x.id));
-          const novel = incoming.filter((x) => !existingIds.has(x.id));
-          addedCount = novel.length;
-          return novel.length > 0 ? [...prev, ...novel] : prev;
-        });
-
-        setMarisSyncMessage(
-          addedCount > 0
-            ? `Synced +${addedCount} live MARIS parcels`
-            : `All ${incoming.length} farm parcels in view loaded`
-        );
+        setMarisSyncMessage(result.message);
       } catch {
-        setMarisSyncMessage(`MARIS GIS busy — showing 120 ${region.id === 'macon' ? 'Macon' : 'Como'} parcels`);
+        setMarisSyncMessage(`GIS service busy — try zooming closer and clicking Sync Nearby GIS again`);
       } finally {
         setIsSyncingMaris(false);
       }
     },
-    [region, regionId, updateParcels]
+    [regionId, updateParcels]
   );
 
   const handleAdjustIrrigationZone = (zoneId: string) => {
@@ -374,24 +355,62 @@ export function App() {
     setIsDrawingPlot(false);
   };
 
-  const handleReassignEquipment = (eqId: string, parcelId: string) => {
-    const targetParcel = parcels.find((p) => p.id === parcelId);
-    setEquipmentByRegion((prev) => ({
+  const handleChangeEquipmentModel = (slot: 'primary' | 'applicator', catalogId: string) => {
+    if (!selectedParcel) return;
+    const tpl = EQUIPMENT_CATALOG.find((m) => m.catalogId === catalogId);
+    setEquipmentOverrides((prev) => ({
       ...prev,
-      [regionId]: prev[regionId].map((eq) =>
-        eq.id === eqId
-          ? {
-              ...eq,
-              assignedParcelId: parcelId,
-              currentTask: targetParcel
-                ? `Active Field Pass - ${targetParcel.name}`
-                : eq.currentTask,
-            }
-          : eq
-      ),
+      [selectedParcel.id]: {
+        ...prev[selectedParcel.id],
+        ...(slot === 'primary'
+          ? { primaryCatalogId: catalogId, primarySpeedMph: tpl?.defaultSpeedMph }
+          : { applicatorCatalogId: catalogId, applicatorSpeedMph: tpl?.defaultSpeedMph }),
+      },
     }));
+  };
+
+  const handleToggleEquipmentStatus = (slot: 'primary' | 'applicator') => {
+    if (!selectedParcel) return;
+    const current = equipment.find((e) => e.slot === slot);
+    const nextStatus: EquipmentUnit['status'] =
+      current?.status === 'Working'
+        ? 'Online'
+        : current?.status === 'Online'
+        ? 'Idle'
+        : 'Working';
+    setEquipmentOverrides((prev) => ({
+      ...prev,
+      [selectedParcel.id]: {
+        ...prev[selectedParcel.id],
+        ...(slot === 'primary' ? { primaryStatus: nextStatus } : { applicatorStatus: nextStatus }),
+      },
+    }));
+  };
+
+  const handleAdjustEquipmentSpeed = (slot: 'primary' | 'applicator', deltaMph: number) => {
+    if (!selectedParcel) return;
+    const current = equipment.find((e) => e.slot === slot);
+    if (!current) return;
+    const minS = current.minSpeedMph ?? 2;
+    const maxS = current.maxSpeedMph ?? 16;
+    const base = current.status === 'Idle' ? minS : current.speedMph;
+    const nextSpeed = Number(Math.max(minS, Math.min(maxS, base + deltaMph)).toFixed(1));
+    setEquipmentOverrides((prev) => ({
+      ...prev,
+      [selectedParcel.id]: {
+        ...prev[selectedParcel.id],
+        ...(slot === 'primary'
+          ? { primarySpeedMph: nextSpeed, primaryStatus: 'Working' }
+          : { applicatorSpeedMph: nextSpeed, applicatorStatus: 'Working' }),
+      },
+    }));
+  };
+
+  const handleReassignEquipment = (_eqId: string, parcelId: string) => {
+    const targetParcel = parcels.find((p) => p.id === parcelId);
     if (targetParcel) {
       setSelectedParcelId(targetParcel.id);
+      setInspectedEquipmentId(null);
     }
   };
 
@@ -547,8 +566,15 @@ export function App() {
                 setSelectedParcelId(eq.assignedParcelId);
                 setInspectedEquipmentId(eq.id);
               }}
+              onChangeEquipmentModel={handleChangeEquipmentModel}
+              onToggleEquipmentStatus={handleToggleEquipmentStatus}
+              onAdjustEquipmentSpeed={handleAdjustEquipmentSpeed}
               onAdjustIrrigationZone={handleAdjustIrrigationZone}
               onOpenParcelDetail={() => setParcelDetailOpen(true)}
+              onOpenCabMode={() => {
+                setIsDrawingPlot(false);
+                setCabModeOpen(true);
+              }}
             />
           </div>
         </div>

@@ -170,8 +170,8 @@ export const LeftAnalyticsRail: React.FC<LeftAnalyticsRailProps> = ({
           <button
             type="button"
             onClick={onOpenParcelDetail}
-            className="truncate text-left text-[12px] font-medium text-[#dce2d4]/75 transition-colors hover:text-[#d8f274]"
-            title="Inspect full Mississippi parcel dossier"
+            className="min-w-0 flex-1 truncate text-left text-[12px] font-medium text-[#dce2d4]/80 transition-colors hover:text-[#d8f274]"
+            title="Inspect full cadastral parcel dossier & ownership"
           >
             {summary.subtitle}
           </button>
@@ -200,6 +200,15 @@ export const LeftAnalyticsRail: React.FC<LeftAnalyticsRailProps> = ({
             </button>
           </div>
         </div>
+
+        {scope === 'parcel' && selectedParcel.ownerName && (
+          <div className="mb-1 flex items-center justify-between gap-2 rounded-lg bg-white/[0.035] px-2 py-1 text-[10.5px]">
+            <span className="shrink-0 text-[#dce2d4]/48">Owner</span>
+            <span className="truncate font-medium text-[#d8f274]" title={selectedParcel.ownerName}>
+              {selectedParcel.ownerName}
+            </span>
+          </div>
+        )}
 
         <div className="flex items-end justify-between gap-3 pt-1">
           {/* Segmented Arc Gauge + Big % */}

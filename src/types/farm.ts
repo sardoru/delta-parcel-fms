@@ -83,6 +83,8 @@ export interface RawMarisProperties {
   range: string;
   siteadd: string;
   szip: string;
+  ownname?: string;
+  stateCode?: string;
   gisAcres: number;
   taxAcres: number;
   cultAcres: number;
@@ -101,6 +103,7 @@ export interface Parcel {
   name: string;
   parno: string;
   fsaTract: string;
+  ownerName: string;
   county: string;
   cityState: string;
   siteAddress: string;
@@ -108,7 +111,7 @@ export interface Parcel {
   legalDesc: string;
   taxYear: string;
   landValueUsd: number;
-  source: 'MARIS 2024' | 'MARIS Live' | 'User Surveyed';
+  source: 'MARIS 2024' | 'MARIS Live' | 'AR GIS Live' | 'TX StratMap' | 'NC OneMap' | 'User Surveyed';
   crop: 'Soybeans' | 'Upland Cotton' | 'Field Corn' | 'Grain Sorghum' | 'Winter Wheat Cover';
   variety: string;
   areaAcres: number;
@@ -149,9 +152,11 @@ export interface Parcel {
 
 export interface EquipmentUnit {
   id: string;
+  catalogId?: string;
+  slot?: 'primary' | 'applicator';
   name: string;
   model: string;
-  kind: 'tractor' | 'sprayer';
+  kind: 'tractor' | 'sprayer' | 'combine' | 'picker' | 'aerial';
   status: 'Online' | 'Working' | 'Idle';
   connectivity: string;
   lastUpdated: string;
@@ -161,6 +166,11 @@ export interface EquipmentUnit {
   primaryMetricValue: string;
   areaCoveredAcres: number;
   speedMph: number;
+  minSpeedMph?: number;
+  maxSpeedMph?: number;
+  rateAcresPerHr?: number;
+  etaHours?: number;
+  tankCapacityGal?: number;
   shiftStart: string;
   shiftEnd: string;
   shiftProgress: number;

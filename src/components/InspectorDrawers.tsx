@@ -131,6 +131,10 @@ export const ParcelDetailDrawer: React.FC<ParcelDetailDrawerProps> = ({
             </div>
             <div className="mt-2.5 space-y-1.5 text-[11.5px]">
               <div className="flex justify-between gap-2">
+                <span className="text-[#dce2d4]/55">Registered Owner</span>
+                <span className="text-right font-semibold text-[#d8f274]">{parcel.ownerName}</span>
+              </div>
+              <div className="flex justify-between gap-2">
                 <span className="text-[#dce2d4]/55">Parcel ID (PARNO)</span>
                 <span className="font-mono text-[#f3f5ef]">{parcel.parno}</span>
               </div>

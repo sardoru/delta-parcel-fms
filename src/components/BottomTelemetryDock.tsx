@@ -1,6 +1,13 @@
 import React, { useMemo } from 'react';
-import { ArrowUpRight, Clock } from '@phosphor-icons/react';
+import {
+  ArrowUpRight,
+  Clock,
+  Minus,
+  Plus,
+  SteeringWheel,
+} from '@phosphor-icons/react';
 import { AreaUnit, EquipmentUnit, Parcel } from '../types/farm';
+import { EQUIPMENT_CATALOG } from '../data/equipmentCatalog';
 import { formatArea, formatSpeed, formatYield } from '../utils/units';
 
 interface BottomTelemetryDockProps {
@@ -8,95 +15,143 @@ interface BottomTelemetryDockProps {
   selectedParcel: Parcel;
   unit: AreaUnit;
   onSelectEquipment: (eq: EquipmentUnit) => void;
+  onChangeEquipmentModel: (slot: 'primary' | 'applicator', catalogId: string) => void;
+  onToggleEquipmentStatus: (slot: 'primary' | 'applicator') => void;
+  onAdjustEquipmentSpeed: (slot: 'primary' | 'applicator', deltaMph: number) => void;
   onAdjustIrrigationZone: (zoneId: string) => void;
   onOpenParcelDetail: () => void;
+  onOpenCabMode: () => void;
 }
 
-/** Crisp isometric technical schematic matching the wireframe tractor & sprayer in the reference HUD */
 const TractorWireframe: React.FC = () => (
-  <svg viewBox="0 0 110 52" className="h-[46px] w-[96px]" fill="none">
-    {/* Rear large tire */}
-    <ellipse cx="34" cy="36" rx="12" ry="12" stroke="rgba(243,245,239,0.68)" strokeWidth="1.3" />
+  <svg viewBox="0 0 116 52" className="h-[44px] w-[98px]" fill="none">
+    <ellipse cx="34" cy="36" rx="12" ry="12" stroke="rgba(243,245,239,0.72)" strokeWidth="1.3" />
     <ellipse cx="34" cy="36" rx="6" ry="6" stroke="rgba(243,245,239,0.45)" strokeWidth="1.1" />
-    <circle cx="34" cy="36" r="2" fill="rgba(216,242,116,0.75)" />
-    {/* Front tire */}
-    <ellipse cx="77" cy="40" rx="8" ry="8" stroke="rgba(243,245,239,0.68)" strokeWidth="1.3" />
-    <ellipse cx="77" cy="40" rx="3.8" ry="3.8" stroke="rgba(243,245,239,0.45)" strokeWidth="1" />
-    {/* Cab */}
-    <path
-      d="M27 25 L32 9 L53 9 L56 23 L27 25 Z"
-      stroke="rgba(243,245,239,0.72)"
-      strokeWidth="1.2"
-      strokeLinejoin="round"
-    />
-    {/* RTK Dome */}
+    <circle cx="34" cy="36" r="2" fill="rgba(216,242,116,0.85)" />
+    <ellipse cx="79" cy="40" rx="8" ry="8" stroke="rgba(243,245,239,0.72)" strokeWidth="1.3" />
+    <ellipse cx="79" cy="40" rx="3.8" ry="3.8" stroke="rgba(243,245,239,0.45)" strokeWidth="1" />
+    <path d="M27 25 L32 9 L53 9 L56 23 L27 25 Z" stroke="rgba(243,245,239,0.76)" strokeWidth="1.2" strokeLinejoin="round" />
     <path d="M40 9 L40 5.5 M37 5.5 L43 5.5" stroke="#d8f274" strokeWidth="1.3" strokeLinecap="round" />
-    {/* Hood & chassis */}
-    <path
-      d="M54 20 L84 23 L86 35 L46 35"
-      stroke="rgba(243,245,239,0.72)"
-      strokeWidth="1.2"
-      strokeLinejoin="round"
-    />
-    {/* Exhaust stack */}
+    <path d="M54 20 L86 23 L88 35 L46 35" stroke="rgba(243,245,239,0.76)" strokeWidth="1.2" strokeLinejoin="round" />
     <path d="M58 20 L58 10 L61 8" stroke="rgba(243,245,239,0.55)" strokeWidth="1.2" strokeLinecap="round" />
-    {/* Grille lines */}
-    <path d="M74 25 L82 26 M74 28 L82 29" stroke="rgba(243,245,239,0.4)" strokeWidth="1" />
+  </svg>
+);
+
+const CottonPickerWireframe: React.FC = () => (
+  <svg viewBox="0 0 124 52" className="h-[44px] w-[106px]" fill="none">
+    {/* Round module builder rear */}
+    <rect x="20" y="13" width="38" height="20" rx="4" stroke="rgba(243,245,239,0.75)" strokeWidth="1.25" />
+    <circle cx="38" cy="23" r="6.5" stroke="#d8f274" strokeWidth="1.2" strokeDasharray="2.5 2" />
+    {/* Forward cab */}
+    <path d="M58 14 L76 14 L81 26 L58 26 Z" stroke="rgba(243,245,239,0.8)" strokeWidth="1.2" />
+    <path d="M65 14 L65 10 M62 10 L68 10" stroke="#d8f274" strokeWidth="1.3" strokeLinecap="round" />
+    {/* 6-row picking units front */}
+    <path d="M81 24 L103 33 L103 40 L80 40 L80 28" stroke="rgba(243,245,239,0.75)" strokeWidth="1.2" strokeLinejoin="round" />
+    <path d="M88 34 L101 34 M88 37 L101 37" stroke="#f0bb66" strokeWidth="1.1" />
+    {/* Drive & steer tires */}
+    <circle cx="67" cy="39" r="9.5" stroke="rgba(243,245,239,0.76)" strokeWidth="1.3" />
+    <circle cx="67" cy="39" r="4" stroke="rgba(243,245,239,0.45)" strokeWidth="1" />
+    <circle cx="29" cy="41" r="7" stroke="rgba(243,245,239,0.7)" strokeWidth="1.25" />
+  </svg>
+);
+
+const CombineWireframe: React.FC = () => (
+  <svg viewBox="0 0 128 52" className="h-[44px] w-[110px]" fill="none">
+    {/* Unload auger */}
+    <path d="M36 13 L12 8" stroke="#d8f274" strokeWidth="1.3" strokeLinecap="round" />
+    {/* Grain tank & body */}
+    <path d="M24 20 L34 11 L62 11 L68 20 L68 34 L24 34 Z" stroke="rgba(243,245,239,0.75)" strokeWidth="1.2" strokeLinejoin="round" />
+    {/* Panoramic cab */}
+    <path d="M68 14 L83 14 L87 26 L68 26 Z" stroke="rgba(243,245,239,0.8)" strokeWidth="1.2" />
+    <path d="M75 14 L75 10 M72 10 L78 10" stroke="#d8f274" strokeWidth="1.3" strokeLinecap="round" />
+    {/* Feederhouse & 40ft draper reel */}
+    <path d="M84 26 L100 35 L112 35 L112 41 L92 41 L82 32" stroke="rgba(243,245,239,0.75)" strokeWidth="1.2" />
+    <circle cx="107" cy="33" r="5" stroke="#f0bb66" strokeWidth="1.2" strokeDasharray="2 1.8" />
+    {/* Front tracks + rear steer tire */}
+    <rect x="61" y="34" width="22" height="10" rx="5" stroke="rgba(243,245,239,0.78)" strokeWidth="1.3" />
+    <circle cx="33" cy="40" r="6.5" stroke="rgba(243,245,239,0.7)" strokeWidth="1.25" />
   </svg>
 );
 
 const SprayerWireframe: React.FC = () => (
-  <svg viewBox="0 0 124 52" className="h-[46px] w-[108px]" fill="none">
-    {/* High-clearance boom truss */}
+  <svg viewBox="0 0 124 52" className="h-[44px] w-[108px]" fill="none">
     <path
       d="M8 22 L116 22 M14 18 L110 18 M20 18 L24 22 M34 18 L38 22 M86 18 L90 22 M100 18 L104 22"
-      stroke="rgba(243,245,239,0.62)"
-      strokeWidth="1.1"
+      stroke="rgba(243,245,239,0.68)"
+      strokeWidth="1.15"
       strokeLinecap="round"
     />
-    {/* Tank & Forward Cab */}
-    <rect x="44" y="12" width="26" height="14" rx="4" stroke="rgba(243,245,239,0.75)" strokeWidth="1.25" />
-    <path d="M70 15 L83 16 L86 26 L70 26 Z" stroke="rgba(243,245,239,0.72)" strokeWidth="1.2" />
-    {/* High-clearance legs & narrow row-crop tires */}
-    <path d="M46 26 L42 38 M76 26 L80 38" stroke="rgba(243,245,239,0.6)" strokeWidth="1.3" />
-    <circle cx="41" cy="40" r="8" stroke="rgba(243,245,239,0.7)" strokeWidth="1.25" />
+    <rect x="44" y="12" width="26" height="14" rx="4" stroke="rgba(243,245,239,0.78)" strokeWidth="1.25" />
+    <path d="M70 15 L83 16 L86 26 L70 26 Z" stroke="rgba(243,245,239,0.75)" strokeWidth="1.2" />
+    <path d="M46 26 L42 38 M76 26 L80 38" stroke="rgba(243,245,239,0.65)" strokeWidth="1.3" />
+    <circle cx="41" cy="40" r="8" stroke="rgba(243,245,239,0.74)" strokeWidth="1.25" />
     <circle cx="41" cy="40" r="3.5" stroke="rgba(243,245,239,0.45)" strokeWidth="1" />
-    <circle cx="81" cy="40" r="8" stroke="rgba(243,245,239,0.7)" strokeWidth="1.25" />
+    <circle cx="81" cy="40" r="8" stroke="rgba(243,245,239,0.74)" strokeWidth="1.25" />
     <circle cx="81" cy="40" r="3.5" stroke="rgba(243,245,239,0.45)" strokeWidth="1" />
-    {/* Spray mist ticks under boom */}
     <path
-      d="M16 25 L16 28 M28 25 L28 28 M96 25 L96 28 M108 25 L108 28"
+      d="M16 25 L16 30 M28 25 L28 30 M96 25 L96 30 M108 25 L108 30"
       stroke="#e6a84c"
-      strokeWidth="1.2"
+      strokeWidth="1.25"
       strokeLinecap="round"
       strokeDasharray="1.5 2"
     />
   </svg>
 );
 
+const AerialAircraftWireframe: React.FC = () => (
+  <svg viewBox="0 0 124 52" className="h-[44px] w-[108px]" fill="none">
+    {/* Wings */}
+    <path d="M12 24 L112 24 L106 28 L18 28 Z" stroke="rgba(243,245,239,0.78)" strokeWidth="1.2" />
+    {/* Fuselage & cockpit */}
+    <ellipse cx="62" cy="24" rx="10" ry="7" stroke="rgba(243,245,239,0.8)" strokeWidth="1.25" />
+    <path d="M62 17 L62 8 M54 12 L70 12" stroke="rgba(243,245,239,0.6)" strokeWidth="1.2" strokeLinecap="round" />
+    {/* Landing gear */}
+    <path d="M54 30 L48 39 M70 30 L76 39" stroke="rgba(243,245,239,0.6)" strokeWidth="1.2" />
+    <circle cx="48" cy="40" r="2.5" stroke="rgba(243,245,239,0.75)" strokeWidth="1.2" />
+    <circle cx="76" cy="40" r="2.5" stroke="rgba(243,245,239,0.75)" strokeWidth="1.2" />
+    {/* Spray mist plume */}
+    <path d="M22 30 L22 36 M36 30 L36 36 M88 30 L88 36 M102 30 L102 36" stroke="#5ec8eb" strokeWidth="1.3" strokeDasharray="1.5 2" />
+  </svg>
+);
+
+function renderMachineWireframe(kind: EquipmentUnit['kind']) {
+  switch (kind) {
+    case 'picker':
+      return <CottonPickerWireframe />;
+    case 'combine':
+      return <CombineWireframe />;
+    case 'sprayer':
+      return <SprayerWireframe />;
+    case 'aerial':
+      return <AerialAircraftWireframe />;
+    default:
+      return <TractorWireframe />;
+  }
+}
+
 const StepDutyChart: React.FC<{ steps: number[]; accent: string }> = ({ steps, accent }) => {
   const w = 160;
-  const h = 36;
+  const h = 32;
   const stepW = w / Math.max(1, steps.length - 1);
   let path = '';
   steps.forEach((v, i) => {
     const x = i * stepW;
-    const y = h - 4 - v * (h - 10);
+    const y = h - 4 - v * (h - 9);
     if (i === 0) {
       path += `M ${x} ${y}`;
     } else {
-      const prevY = h - 4 - steps[i - 1] * (h - 10);
+      const prevY = h - 4 - steps[i - 1] * (h - 9);
       path += ` L ${x} ${prevY} L ${x} ${y}`;
     }
   });
 
   const lastX = w;
-  const lastY = h - 4 - steps[steps.length - 1] * (h - 10);
+  const lastY = h - 4 - steps[steps.length - 1] * (h - 9);
 
   return (
-    <svg viewBox={`0 0 ${w + 6} ${h}`} className="h-[36px] w-full overflow-visible">
+    <svg viewBox={`0 0 ${w + 6} ${h}`} className="h-[32px] w-full overflow-visible">
       <line x1={0} y1={h - 4} x2={w} y2={h - 4} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
-      <path d={path} fill="none" stroke={accent} strokeWidth="1.4" strokeOpacity="0.88" />
+      <path d={path} fill="none" stroke={accent} strokeWidth="1.4" strokeOpacity="0.9" />
       <circle cx={lastX} cy={lastY} r="3" fill={accent} />
     </svg>
   );
@@ -107,8 +162,12 @@ export const BottomTelemetryDock: React.FC<BottomTelemetryDockProps> = ({
   selectedParcel,
   unit,
   onSelectEquipment,
+  onChangeEquipmentModel,
+  onToggleEquipmentStatus,
+  onAdjustEquipmentSpeed,
   onAdjustIrrigationZone,
   onOpenParcelDetail,
+  onOpenCabMode,
 }) => {
   const avgVariance = useMemo(() => {
     const offsets = selectedParcel.irrigationOffsets;
@@ -128,57 +187,115 @@ export const BottomTelemetryDock: React.FC<BottomTelemetryDockProps> = ({
   }, [yieldFormatted.value]);
 
   return (
-    <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(220px,0.92fr)_minmax(220px,0.92fr)_minmax(340px,1.55fr)]">
-      {/* Equipment Cards (Tractor T-04 & Sprayer S-01) */}
-      {equipment.map((eq) => {
-        const isOnline = eq.status === 'Online';
-        const accent = isOnline ? '#d8f274' : '#e6a84c';
+    <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(250px,1.02fr)_minmax(250px,1.02fr)_minmax(340px,1.42fr)]">
+      {/* Live Changeable Equipment Cards (Primary Harvester/Tractor & Sprayer/Applicator) */}
+      {equipment.map((eq, cardIdx) => {
+        const slot: 'primary' | 'applicator' = eq.slot || (cardIdx === 0 ? 'primary' : 'applicator');
+        const options = EQUIPMENT_CATALOG.filter((m) => m.slot === slot);
+        const isIdle = eq.status === 'Idle';
+        const accent = isIdle
+          ? '#9ba396'
+          : slot === 'primary'
+          ? '#d8f274'
+          : eq.kind === 'aerial'
+          ? '#5ec8eb'
+          : '#e6a84c';
+        const speedStep = eq.kind === 'aerial' ? 5 : 0.5;
+
         return (
           <article
-            key={eq.id}
-            onClick={() => onSelectEquipment(eq)}
-            className="glass-panel group flex cursor-pointer flex-col justify-between rounded-[22px] p-4 transition-all hover:border-white/20"
+            key={slot}
+            className="glass-panel group flex flex-col justify-between rounded-[22px] p-3.5 transition-all hover:border-white/22"
           >
-            {/* Header */}
+            {/* Header with Inline Machine Switcher Dropdown + Cab / Inspect Actions */}
             <div className="flex items-start justify-between gap-2">
-              <div>
-                <h3 className="text-[14px] font-medium text-[#f3f5ef]">{eq.name}</h3>
-                <div className="font-mono text-[10px] text-[#dce2d4]/48">{eq.lastUpdated}</div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={eq.catalogId || options[0]?.catalogId}
+                    onChange={(e) => onChangeEquipmentModel(slot, e.target.value)}
+                    aria-label={`Change ${slot === 'primary' ? 'harvester or tractor' : 'sprayer or applicator'} model`}
+                    className="max-w-full cursor-pointer truncate rounded-lg border border-white/12 bg-white/[0.06] px-2 py-0.5 text-[13px] font-semibold text-[#f3f5ef] transition-colors hover:border-[#d8f274]/50 focus:border-[#d8f274] focus:outline-none"
+                  >
+                    {options.map((opt) => (
+                      <option key={opt.catalogId} value={opt.catalogId} className="bg-[#161a15] text-[#f3f5ef]">
+                        {opt.shortName} ({opt.implementWidthFt}ft)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mt-1 truncate font-mono text-[9.5px] text-[#dce2d4]/58" title={eq.currentTask}>
+                  {selectedParcel.name} · {selectedParcel.crop}
+                </div>
               </div>
+
+              <div className="flex shrink-0 items-center gap-1">
+                {slot === 'primary' && (
+                  <button
+                    type="button"
+                    onClick={onOpenCabMode}
+                    title="Jump into first-person combine cab on this parcel"
+                    className="flex h-7 items-center gap-1 rounded-full border border-[#d8f274]/35 bg-[#d8f274]/12 px-2 font-mono text-[9.5px] font-semibold text-[#d8f274] transition-colors hover:bg-[#d8f274] hover:text-[#13170f]"
+                  >
+                    <SteeringWheel size={12} weight="bold" />
+                    <span>Cab</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onSelectEquipment(eq)}
+                  aria-label={`Inspect ${eq.name} telemetry`}
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-[#dce2d4]/65 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <ArrowUpRight size={15} />
+                </button>
+              </div>
+            </div>
+
+            {/* Dynamic Machine Wireframe Schematic */}
+            <div className="my-1 flex items-center justify-between gap-2 px-1">
+              {renderMachineWireframe(eq.kind)}
+              <div className="text-right font-mono text-[9.5px] leading-snug text-[#dce2d4]/65">
+                <div className="font-semibold text-[#eef2e8]">
+                  {eq.rateAcresPerHr ? `${eq.rateAcresPerHr} ac/hr` : 'Standby'}
+                </div>
+                <div className="text-[#dce2d4]/48">
+                  {eq.etaHours ? `ETA ${eq.etaHours}h left` : 'Paused'}
+                </div>
+                <div className="text-[#dce2d4]/42">{eq.implementWidthFt}ft swath</div>
+              </div>
+            </div>
+
+            {/* Interactive Status Toggle Pill + Connectivity */}
+            <div className="mb-1 flex items-center justify-between">
               <button
                 type="button"
-                aria-label={`Inspect ${eq.name} telemetry`}
-                className="flex h-7 w-7 items-center justify-center rounded-full text-[#dce2d4]/65 transition-colors group-hover:bg-white/10 group-hover:text-white"
-              >
-                <ArrowUpRight size={15} />
-              </button>
-            </div>
-
-            {/* Technical Wireframe + Status Row */}
-            <div className="my-1 flex flex-col items-center">
-              {eq.kind === 'tractor' ? <TractorWireframe /> : <SprayerWireframe />}
-            </div>
-
-            <div className="mb-1.5 flex items-center justify-between">
-              <span
-                className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium"
+                onClick={() => onToggleEquipmentStatus(slot)}
+                title="Click to toggle machine status (Working / Online / Idle)"
+                className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-all hover:brightness-115 active:scale-[0.97]"
                 style={{
-                  borderColor: isOnline ? 'rgba(216,242,116,0.28)' : 'rgba(230,168,76,0.32)',
-                  backgroundColor: isOnline ? 'rgba(216,242,116,0.10)' : 'rgba(230,168,76,0.12)',
+                  borderColor: `${accent}55`,
+                  backgroundColor: `${accent}1c`,
                   color: accent,
                 }}
               >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accent }} />
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${eq.status === 'Working' ? 'animate-pulse' : ''}`}
+                  style={{ backgroundColor: accent }}
+                />
                 {eq.status}
+              </button>
+              <span className="font-mono text-[9.5px] text-[#dce2d4]/52">
+                {eq.operator.split(' ')[0]} · {eq.connectivity}
               </span>
-              <span className="font-mono text-[10px] text-[#dce2d4]/52">{eq.connectivity}</span>
             </div>
 
-            {/* Stepped Activity Timeline + Scrubber */}
+            {/* Live Stepped Activity Timeline + Parcel Coverage Progress */}
             <StepDutyChart steps={eq.activitySteps} accent={accent} />
 
-            <div className="mt-1 flex items-center justify-between font-mono text-[9.5px] text-[#dce2d4]/48">
+            <div className="mt-0.5 flex items-center justify-between font-mono text-[9px] text-[#dce2d4]/48">
               <span>{eq.shiftStart}</span>
+              <span className="text-[#dce2d4]/62">{Math.round(eq.shiftProgress * 100)}% of parcel</span>
               <span>{eq.shiftEnd}</span>
             </div>
             <div className="mt-1 h-[3px] w-full overflow-hidden rounded-full bg-white/12">
@@ -188,24 +305,42 @@ export const BottomTelemetryDock: React.FC<BottomTelemetryDockProps> = ({
               />
             </div>
 
-            {/* Bottom 3 Metrics */}
-            <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/8 pt-2.5">
+            {/* Bottom 3 Live Metrics + Interactive Speed Control */}
+            <div className="mt-2.5 grid grid-cols-[1fr_1fr_1.25fr] items-end gap-1.5 border-t border-white/8 pt-2">
               <div>
-                <div className="text-[10px] text-[#dce2d4]/50">{eq.primaryMetricLabel}</div>
-                <div className="tabular-nums text-[13px] font-semibold text-[#f3f5ef]">
+                <div className="text-[9.5px] text-[#dce2d4]/50">{eq.primaryMetricLabel}</div>
+                <div className="tabular-nums text-[12.5px] font-semibold text-[#f3f5ef]">
                   {eq.primaryMetricValue}
                 </div>
               </div>
               <div>
-                <div className="text-[10px] text-[#dce2d4]/50">Area</div>
-                <div className="tabular-nums text-[13px] font-semibold text-[#f3f5ef]">
+                <div className="text-[9.5px] text-[#dce2d4]/50">Covered</div>
+                <div className="tabular-nums text-[12.5px] font-semibold text-[#f3f5ef]">
                   {formatArea(eq.areaCoveredAcres, unit)}
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] text-[#dce2d4]/50">Speed</div>
-                <div className="tabular-nums text-[13px] font-semibold text-[#f3f5ef]">
-                  {formatSpeed(eq.speedMph, unit)}
+                <div className="text-[9.5px] text-[#dce2d4]/50">Ground Speed</div>
+                <div className="mt-0.5 flex items-center justify-end gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onAdjustEquipmentSpeed(slot, -speedStep)}
+                    aria-label={`Decrease ${eq.name} speed`}
+                    className="flex h-4.5 w-4.5 items-center justify-center rounded border border-white/15 bg-white/[0.05] text-[#dce2d4]/80 hover:border-[#d8f274]/60 hover:text-white"
+                  >
+                    <Minus size={9} weight="bold" />
+                  </button>
+                  <span className="min-w-[52px] text-center tabular-nums text-[12px] font-semibold text-[#f3f5ef]">
+                    {formatSpeed(eq.speedMph, unit)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onAdjustEquipmentSpeed(slot, speedStep)}
+                    aria-label={`Increase ${eq.name} speed`}
+                    className="flex h-4.5 w-4.5 items-center justify-center rounded border border-white/15 bg-white/[0.05] text-[#dce2d4]/80 hover:border-[#d8f274]/60 hover:text-white"
+                  >
+                    <Plus size={9} weight="bold" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -235,7 +370,6 @@ export const BottomTelemetryDock: React.FC<BottomTelemetryDockProps> = ({
           </div>
 
           <div className="mt-2.5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            {/* Variance Big Number */}
             <div className="shrink-0">
               <div className="tabular-nums text-[24px] font-semibold leading-none tracking-[-0.02em] text-[#f5f7f1]">
                 ± {avgVariance.toFixed(1)}{' '}
@@ -244,7 +378,6 @@ export const BottomTelemetryDock: React.FC<BottomTelemetryDockProps> = ({
               <div className="mt-1 text-[11px] text-[#dce2d4]/52">Average variance</div>
             </div>
 
-            {/* Interactive Zone A / Zone B Matrix */}
             <div className="min-w-0 flex-1 overflow-x-auto">
               <table className="w-full border-collapse text-left text-[11px]">
                 <thead>
@@ -318,7 +451,6 @@ export const BottomTelemetryDock: React.FC<BottomTelemetryDockProps> = ({
               </div>
             </div>
 
-            {/* Live Harvest Spectrum Bars (exact visual motif from reference bottom-right) */}
             <div className="flex h-[52px] flex-1 items-end justify-end gap-[4px] border-b border-white/10 pb-1">
               {selectedParcel.yieldBars.map((val, idx) => {
                 const isPeak = val >= 70;

@@ -110,6 +110,7 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
         .filter(
           (p) =>
             p.name.toLowerCase().includes(q) ||
+            p.ownerName.toLowerCase().includes(q) ||
             p.parno.toLowerCase().includes(q) ||
             p.plss.toLowerCase().includes(q) ||
             p.siteAddress.toLowerCase().includes(q) ||
@@ -297,7 +298,10 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
                         <MapPinArea size={15} className="text-[#d8f274]" />
                         <div>
                           <div className="text-[12.5px] font-medium leading-tight">{p.name}</div>
-                          <div className="text-[10.5px] text-[#dce2d4]/55">
+                          <div className="truncate text-[10px] text-[#d8f274]/80">
+                            {p.ownerName}
+                          </div>
+                          <div className="text-[10px] text-[#dce2d4]/55">
                             {p.crop} · {formatArea(p.areaAcres, unit)}
                           </div>
                         </div>
