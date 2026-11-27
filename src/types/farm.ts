@@ -202,6 +202,8 @@ export interface CottonFacility {
   email?: string;
   phone?: string;
   iceLicensed?: boolean;
+  coordPrecision?: 'rooftop' | 'facility' | 'city_zip';
+  coordSource?: string;
 }
 
 export interface LiveWeather {

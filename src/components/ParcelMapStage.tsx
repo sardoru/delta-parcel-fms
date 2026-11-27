@@ -964,6 +964,24 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
                         ICE
                       </span>
                     )}
+                    {selectedFacility.coordPrecision && (
+                      <span
+                        title={`Coordinate source: ${selectedFacility.coordSource || 'Verified'}`}
+                        className={`rounded-full px-1.5 py-0.5 font-mono text-[9px] ${
+                          selectedFacility.coordPrecision === 'rooftop'
+                            ? 'bg-[#63b97a]/18 text-[#8ee3a4]'
+                            : selectedFacility.coordPrecision === 'facility'
+                            ? 'bg-[#d8f274]/14 text-[#d8f274]'
+                            : 'bg-white/10 text-[#dce2d4]/68'
+                        }`}
+                      >
+                        {selectedFacility.coordPrecision === 'rooftop'
+                          ? '✓ Exact Pin'
+                          : selectedFacility.coordPrecision === 'facility'
+                          ? '✓ Facility POI'
+                          : '~ ZIP Area'}
+                      </span>
+                    )}
                   </div>
                   <h3 className="mt-1 truncate text-[14.5px] font-semibold text-[#f5f7f1]">
                     {selectedFacility.name}
@@ -1026,9 +1044,9 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
                 </div>
               )}
               <div className="flex justify-between gap-2">
-                <span className="text-[#dce2d4]/55">GPS</span>
-                <span className="font-mono text-[#dce2d4]/75">
-                  {selectedFacility.lat.toFixed(4)}°N, {Math.abs(selectedFacility.lng).toFixed(4)}°W
+                <span className="text-[#dce2d4]/55">GPS ({selectedFacility.coordSource || 'Verified'})</span>
+                <span className="font-mono text-[#dce2d4]/80">
+                  {selectedFacility.lat.toFixed(5)}°N, {Math.abs(selectedFacility.lng).toFixed(5)}°W
                 </span>
               </div>
             </div>
