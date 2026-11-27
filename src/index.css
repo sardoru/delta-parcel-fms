@@ -1,0 +1,145 @@
+@import "tailwindcss";
+@import "@fontsource/plus-jakarta-sans/400.css";
+@import "@fontsource/plus-jakarta-sans/500.css";
+@import "@fontsource/plus-jakarta-sans/600.css";
+@import "@fontsource/plus-jakarta-sans/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/600.css";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  color-scheme: dark;
+  --bg-obsidian: #111310;
+  --glass-bg: rgba(23, 25, 21, 0.80);
+  --glass-bg-strong: rgba(20, 22, 18, 0.90);
+  --glass-border: rgba(255, 255, 255, 0.095);
+  --glass-highlight: rgba(255, 255, 255, 0.065);
+  --accent-lime: #d8f274;
+  --accent-lime-soft: rgba(216, 242, 116, 0.16);
+  --accent-amber: #e6a84c;
+  --accent-coral: #df694a;
+  --accent-emerald: #63b97a;
+  --text-primary: #f3f5ef;
+  --text-secondary: rgba(236, 240, 228, 0.64);
+  --text-muted: rgba(226, 232, 216, 0.44);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100vw;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-color: var(--bg-obsidian);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Smoked botanical obsidian glass panels inspired by precision ag cockpit */
+.glass-panel {
+  background: linear-gradient(
+    180deg,
+    rgba(30, 33, 27, 0.80) 0%,
+    rgba(21, 23, 19, 0.84) 100%
+  );
+  backdrop-filter: blur(22px) saturate(130%);
+  -webkit-backdrop-filter: blur(22px) saturate(130%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 18px 44px -16px rgba(0, 0, 0, 0.62),
+    inset 0 1px 0 var(--glass-highlight);
+}
+
+.glass-panel-dense {
+  background: linear-gradient(
+    180deg,
+    rgba(26, 29, 24, 0.90) 0%,
+    rgba(18, 20, 16, 0.94) 100%
+  );
+  backdrop-filter: blur(26px) saturate(135%);
+  -webkit-backdrop-filter: blur(26px) saturate(135%);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  box-shadow:
+    0 24px 60px -18px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.glass-pill {
+  background: rgba(24, 27, 22, 0.72);
+  backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  box-shadow:
+    0 8px 24px -10px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-panel,
+  .glass-panel-dense,
+  .glass-pill {
+    background: #1a1c17;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Custom sleek dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(216, 242, 116, 0.35);
+}
+
+/* Active parcel luminous pulse */
+@keyframes pulseRing {
+  0% {
+    transform: scale(0.86);
+    opacity: 0.75;
+  }
+  70% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulseRing 2.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-ring {
+    animation: none;
+  }
+}
