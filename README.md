@@ -1,21 +1,51 @@
-# DeltaPlot — Mississippi Parcel Farm Management System
+# DeltaPlot — Precision Parcel Farm Management System
 
-**Live Deployment:** [https://delta-parcel-fms.vercel.app](https://delta-parcel-fms.vercel.app) · **Repository:** [github.com/sardoru/delta-parcel-fms](https://github.com/sardoru/delta-parcel-fms)
+**Live Deployment:** [https://delta-parcel-fms.vercel.app](https://delta-parcel-fms.vercel.app) · **Repository:** [github.com/sardoru/delta-parcel-fms](https://github.com/sardoru/delta-parcel-fms) · **Auth Roadmap:** [Issue #1](https://github.com/sardoru/delta-parcel-fms/issues/1)
 
-A parcel-first precision agriculture operations cockpit built for **Mississippi farmers**, grounded in **official 2024 Mississippi MARIS cadastral farmland parcels** across two major Mississippi row-crop basins on a live 3D-tilted satellite map:
+A parcel-first precision agriculture operations cockpit and farmer owner portal built on **official multi-state county cadastral farmland parcels**, **live federal USGS & NASA hydrological/LiDAR intelligence**, **498 verified U.S. Cotton Gins & Warehouses**, an **Ag-Drone Spraying Marketplace**, and **Google-Maps-style County Tax Assessor postcard ownership verification**.
 
-- **Bogue Chitto Gin · Macon, MS (Noxubee County, FIPS `28103`)** — 120 official MARIS 2024 East MS Black Belt Prairie farm parcels (**28,770 surveyed acres / 25,197 cultivated acres**) centered around **Bogue Chitto Gin (`4762 Deerbrook Rd, Macon, MS 39341`)** with live haul-distance telemetry (`mi to Gin`) and Blackland soil series (**Brooksville, Okolona, Leeper, Vaiden, Kipling**).
-- **Como, MS (Panola County, FIPS `28107`)** — 120 official MARIS 2024 West MS cultivated farm parcels (**24,087 surveyed acres / 15,433 cultivated acres**) along Hwy 310, US-51, and I-55 with MLRA-134 loess soil series (**Memphis, Loring, Collins, Falaya, Grenada**).
-- **All U.S. Cotton Gins & Warehouses (`All USA (498)`)** — Every geocoded **U.S. Cotton Gin (447)** and **U.S. Cotton Warehouse (51)** across all **17 U.S. Cotton Belt states** (`TX`, `GA`, `MS`, `AR`, `NC`, `AL`, `TN`, `LA`, `MO`, `SC`, `CA`, `OK`, `AZ`, `VA`, `FL`, `KS`, `NM`) sourced from `cotton-gin-map.vercel.app`, cross-verified against Esri `PointAddress`, EPA FRS GPS/Air, and MS MARIS 2024 cadastral records (`206 ✓ Rooftop Pin`, `134 ✓ Street / POI`, `158 ~ Approx Area`).
-- **In-Cab Combine Harvester Driving & RTK AutoTrac Simulator ([Launch Cab View](https://delta-parcel-fms.vercel.app/?mode=cab))** — First-person panoramic combine cab (`X9 1100` + 40-ft `RD40F` draper/cotton header) playable directly inside any selected Mississippi MARIS parcel with Cornerpost OLED telemetry, interactive steering wheel & HydroHandle throttle, clickable CommandCenter™ G5 autopilot waypoints, Auto AB Swaths, live swath coverage painting, and Day/Dusk harvest lighting.
+![DeltaPlot — Live 3D Satellite Parcel Dashboard (Bogue Chitto Gin · Macon, MS)](docs/preview-macon.png)
 
-![DeltaPlot Bogue Chitto Gin — Macon, MS Live Satellite Parcel Dashboard](docs/preview-macon.png)
+---
 
-### In-Cab Combine Harvester Simulator Screenshots
+## Feature Showcase
 
-![DeltaPlot X9 1100 Combine Harvester Cab — Daytime Cotton Harvest with Cornerpost OLED, Steering Column & CommandCenter G5 Waypoints](docs/preview-combine-cab.png)
+### Live USGS Water / Drainage + NASA SMAP & USGS 3DEP 1-Meter LiDAR Map Overlays
+Toggle federal raster heatmaps directly onto the 3D satellite map from either the right-side map rail or inside the left **Health Map** panel (`USGS Water` + `NASA LiDAR` tabs):
+- **USGS Water + NASA SMAP** ([Open Live](https://delta-parcel-fms.vercel.app/?overlay=water&healthTab=water)) — Streams live **USGS NHD** creeks & drainage channels, **USGS WBD HUC-12** watershed boundaries, and **NASA GIBS SMAP L4** surface soil moisture tiles alongside live **USGS National Water Dashboard** stream gages & **FEMA NFHL** flood zones.
+- **USGS 3DEP 1m LiDAR Heatmap** ([Open Live](https://delta-parcel-fms.vercel.app/?overlay=lidar&healthTab=lidar)) — Streams live 1-meter LiDAR elevation tiles with inline **`Elev` | `Slope` | `2ft`** contour switching plus selectable **NASA GEDI L2A** & **ICESat-2 ATL08** orbital LiDAR scans.
 
-![DeltaPlot X9 1100 Combine Harvester Cab — Dusk Night Harvest with LED Work Lights & Active RTK AutoTrac Autopilot](docs/preview-combine-dusk.png)
+![DeltaPlot — Live USGS Water/Drainage, NASA SMAP & USGS 3DEP 1m LiDAR Map Overlays](docs/preview-usgs-lidar.png)
+
+### Farmer Owner Portal & Farm Management Dashboard
+Verify ownership of your parcels to manage your entire farm portfolio from a dedicated owner dashboard ([Open Portal](https://delta-parcel-fms.vercel.app/?mode=portal)):
+- **Portfolio KPIs:** Verified owned acreage, pending USPS postcard claims, winter cover crop coverage %, uploaded soil tests & certifications, and active drone RFQs.
+- **4 Dedicated Portal Views:** `Farm Dashboard`, `Crop Cover & Rotation` (multi-year cross-parcel matrix), `Docs, Certs & Soil Tests` (unified Farm Vault), and `Postcard Claims` (USPS PIN verification ledger).
+
+![DeltaPlot — Farmer Owner Portal & Farm Management Dashboard](docs/preview-farmer-portal.png)
+
+### County Tax Assessor Postcard Ownership Claiming (Google-Maps-Style Verification)
+Prevent unauthorized parcel claims using live County Tax Roll verification ([Open Claim Flow](https://delta-parcel-fms.vercel.app/?drawer=claim)):
+- Queries live **MS MARIS County Tax Assessor records** (`MAILADD1`, `MCITY1`, `MZIP1`) to retrieve the owner's official mailing address on file and locks the USPS verification postcard exclusively to that address (`7–14 day` USPS delivery + one-time 6-digit PIN).
+- Includes a sandbox postcard preview so reviewers can test the full claim → PIN verification → `✓ Verified Owner` badge → Farmer Portal workflow end-to-end.
+- Future production authentication, server-side Lob/PostGrid postcard dispatch, and private cloud document storage are tracked in [GitHub Issue #1](https://github.com/sardoru/delta-parcel-fms/issues/1).
+
+![DeltaPlot — County Tax Assessor Postcard PIN Ownership Verification](docs/preview-postcard-claim.png)
+
+### Parcel Crop Cover, Multi-Season Crop History & Document / Soil Test Vault
+Manage agronomic history and compliance records directly on every parcel ([Open Crops & Cover](https://delta-parcel-fms.vercel.app/?drawer=crops) · [Open Docs & Soil Vault](https://delta-parcel-fms.vercel.app/?drawer=documents)):
+- **Active Cash Crop & Winter Cover Crop:** Assign cash crops and winter conservation covers (`Cereal Rye`, `Crimson Clover`, `Winter Wheat Cover`, `Tillage Radish + Oats`, `Hairy Vetch`, `Austrian Winter Pea`, `Black Oats + Clover Mix`) with seeded date & termination targets.
+- **Previous Crops Planted:** Log multi-year crop rotations (`Main Crop`, `Fall/Winter Cover`, `Double-Crop`), varieties, tillage practices, and yield notes.
+- **Document, Certification & Soil Test Uploads:** Drag-and-drop `PDF`, `CSV`, `PNG`, `JPG`, `XLSX`, or `DOCX` files across 6 categories (`Soil Test`, `Certification`, `FSA / USDA Form`, `Spray / Drone Record`, `Deed / Tax Roll`, `Other`) with structured soil lab assay inputs (**pH, OM %, N, P, K, CEC**).
+
+![DeltaPlot — Parcel Crop Cover & Previous Crops Planted Drawer](docs/preview-crops-cover.png)
+
+### Ag-Drone Spraying Marketplace, Multi-Parcel RFQs & Exclusive Territory Claims
+Hold **`⌘` / `Ctrl` / `Shift` + Click** on the map to batch-select multiple parcels and request spraying quotes from FAA Part 137 drone applicators ([Open Marketplace](https://delta-parcel-fms.vercel.app/?mode=drone) · [Open Vendor Signup](https://delta-parcel-fms.vercel.app/?mode=drone-vendor)):
+- **Multi-Parcel Bid Exchange:** Send a single RFQ across all selected parcels with combined acreage, carrier GPA, chemical/defoliant application type, and instant itemized vendor bids.
+- **Vendor Memberships & Exclusive Territories:** Drone service companies can sign up as regional approved vendors or claim exclusive high-priority county territories for a higher tier fee.
+
+![DeltaPlot — Ag-Drone Spraying Marketplace & Exclusive Territory Claims](docs/preview-drone-marketplace.png)
 
 <details>
 <summary>View Como, MS (Panola County) Basin Screenshot</summary>
@@ -26,46 +56,43 @@ A parcel-first precision agriculture operations cockpit built for **Mississippi 
 
 ---
 
-## Overview
+## Core Capabilities
 
-DeltaPlot unifies real Mississippi county cadastral boundaries, high-resolution satellite imagery, vegetation vigor diagnostics, USDA NRCS soil series mapping, fleet telemetry, and poly-pipe / pivot irrigation zone calibration inside a single dark-glass spatial HUD.
+### 1. Multi-State Cadastral GIS & Nationwide Cotton Belt Infrastructure
+- **Bogue Chitto Gin · Macon, MS (Noxubee County, FIPS `28103`):** 120 official MARIS 2024 East MS Black Belt Prairie farm parcels (**28,770 surveyed acres / 25,197 cultivated acres**) with live `mi to Gin` haul distance and Blackland soils (**Brooksville, Okolona, Leeper, Vaiden, Kipling**).
+- **Como, MS (Panola County, FIPS `28107`):** 120 official MARIS 2024 West MS parcels (**24,087 surveyed acres / 15,433 cultivated acres**) with MLRA-134 loess soils (**Memphis, Loring, Collins, Falaya, Grenada**).
+- **All 498 U.S. Cotton Gins & Warehouses (`All USA (498)`):** All **447 Cotton Gins** and **51 Cotton Warehouses** across all **17 U.S. Cotton Belt states**, cross-verified against Esri `PointAddress`, EPA FRS GPS/Air, and county cadastral records.
+- **Live Multi-State County Parcel Sync (`Sync Nearby GIS`):** Click any gin or warehouse (or pan anywhere in view) to pull live official farmland parcel polygons with real county ownership directly from **MS MARIS**, **Arkansas GIS**, **Texas StratMap**, and **NC OneMap**.
+- **Geodesic Parcel Plotter (`+ Plot Parcel`):** Click 3+ GPS vertices on the satellite map to survey custom sub-plots with spherical-earth geodesic acreage persisted to `localStorage`.
 
-Out of the box, the application ships with **120 official cultivated farm parcels** around **Como, MS 38619** (totaling **24,087 surveyed GIS acres** and **15,433 cultivated row-crop acres** along Highway 310, US-51, Interstate 55, Compress Rd, Dunlap Rd, Old Panola Rd, Wilborn Creek, and Holston Rd) — and can dynamically query additional Mississippi parcels anywhere in the viewport directly from the live **MARIS 2024 Cadastral ArcGIS REST API**.
+### 2. Precision Agronomy, Hydrology & Orbital LiDAR (Left Analytics Rail)
+- **Segmented Health Arc Gauge & Owner Header:** Toggle **Plot** vs. **Farm** aggregates, convert **AC / HA** & **°F / °C**, view verified county ownership, and jump directly to **Cover Crops**, **Docs & Soil**, or **Claim Parcel**.
+- **Health Trend Waveform:** Interactive `7 Days`, `14 Days`, and `30 Days` canopy vigor & NDVI scrubber.
+- **3-Mode Health Map (`Stress` | `USGS Water` | `NASA LiDAR`):**
+  - **Stress Zones:** 16×6 sub-parcel stress grid with live map crosshair projection and **AI Agronomy Insights**.
+  - **USGS Water:** Live **USGS National Water Dashboard** streamgage height/discharge, **FEMA NFHL** flood zone lookup, **HUC-12** watershed ID, and one-click map overlay sync.
+  - **NASA LiDAR:** Selectable **NASA GEDI L2A**, **ICESat-2 ATL08**, and **USGS 3DEP 1m DEM** elevation/slope scans with one-click map overlay sync.
+
+### 3. Collapsible Bottom Telemetry Dock & Parcel-Bound Equipment HUD
+- **Hide / Show Bottom Dock (`Hide Dock`):** Collapse the entire telemetry dock into a minimal floating bar (or open with `?dock=hidden`) to maximize 3D satellite map workspace.
+- **Changeable Real Equipment HUD:** Swap primary harvesters/tractors (**John Deere CP770 Picker, X9 1100 Combine, 8R 340 Tractor, Case IH Module Express 635**) and applicators (**Hagie STS16, JD 616R, DJI Agras T50 Drone, Air Tractor 502B**) per parcel with live speed tuning (`-` / `+`), `ac/hr` capacity, and parcel ETA recalculation.
+- **Interactive Irrigation Offset Calibration & Live Yield Spectrum:** Step-calibrate `Zone A / Zone B` (`Z1–Z4`) poly-pipe and pivot timing offsets in real time.
 
 ---
 
-## Key Features
+## Quick Deep Links
 
-### 1. Live 3D-Tilted Geospatial Parcel Map (MapLibre GL JS)
-- **High-Resolution Satellite Imagery:** Powered by Esri World Imagery with subtle transportation and place reference overlays so growers can orient by real roads (`I-55`, `US-51`, `MS-310`, `W Oak Ave`) without obscuring crop rows.
-- **3D Oblique Aerial & 2D Survey Modes:** Launches in a 48° oblique 3D aerial pitch (`3D` toggle switches cleanly to 0° top-down cadastral survey view).
-- **Interactive Cadastral Selection:** Click any of the 120+ Panola County farm parcels to smoothly fly to it, illuminate its exact surveyed boundary in luminous chartreuse, and refresh all analytics, weather, irrigation, and dossier panels.
-- **Multi-Layer Spectral & Soil Modes:**
-  - **Satellite:** Natural-color aerial imagery with glowing active parcel boundary and hover previews.
-  - **NDVI:** Parcel-wide vegetation vigor index color overlay (`0.34 – 0.92` scale).
-  - **Soil:** Panola County MLRA-134 soil series overlay (**Memphis Silt Loam**, **Loring Silt Loam**, **Collins Silt Loam**, **Falaya Silt Loam**, **Grenada Silt Loam**).
-- **Live MARIS GIS Viewport Sync (`Sync MARIS GIS`):** Pan anywhere across Panola, Tate, Quitman, Tunica, DeSoto, Leflore, or neighboring West Mississippi counties and pull live 2024 cultivated farm parcels (`CULT_AC1 >= 25 OR GISACRES >= 50`) straight from `gis.mississippi.edu`.
-- **Geodesic Parcel Plotter (`+ Plot Parcel`):** Click 3 or more GPS vertices directly on the satellite map to survey custom sub-fields or management blocks with real spherical-earth geodesic acreage calculation, persisted to `localStorage`.
-
-### 2. Precision Agronomy & Stress Analytics (Left Rail)
-- **Segmented Health Arc Gauge & Area KPI:** Toggle seamlessly between **Plot** (active parcel GIS vs. cultivated acreage and PLSS Section-Township-Range) and **Farm** (whole-operation aggregate), plus instant **AC / HA** and **°F / °C** unit conversion.
-- **Health Trend Waveform:** Interactive `7 Days`, `14 Days`, and `30 Days` canopy vigor & NDVI time-series chart with hover scrubbing and optimal threshold baseline.
-- **Health Map (`Stress Zones`):** 16×6 sub-parcel spatial stress heatmap. Hovering any zone inspects local moisture %, NDVI, and agronomic stress cause (e.g., Loring fragipan moisture deficit or terrace runoff) while simultaneously projecting a pulsing crosshair at that exact sub-zone inside the selected parcel on the map.
-- **AI Agronomy Insights (`AI Insights`):** Parcel-specific MSU Extension & USDA-NRCS aligned prescriptions (harvest windows, variable-rate lime recommendations, MLRA-134 loess erosion control, EQIP eligibility) with one-click scheduling into the parcel operations log.
-
-### 3. Live Fleet, Irrigation Offset & Harvest Telemetry (Bottom Dock)
-- **Equipment Telemetry Cards (`Tractor T-04` & `Sprayer S-01`):** Isometric technical wireframes, live `Online` / `Working` status, RTK/LTE telemetry badges, stepped shift duty-cycle graphs, fuel/tank/area/speed readouts, and click-to-inspect parcel dispatch reassignment.
-- **Interactive Irrigation Offset Calibration:** Live `Zone A` / `Zone B` (`Z1–Z4`) timing offset matrix for poly-pipe, surge valves, and center-pivot spans. Click any zone offset cell to step-calibrate timing (`±0.5 min`) and recalculate average variance in real time.
-- **Live Yield Volume:** Real-time harvest mass readout (`lbs` / `kg`) and load-interval pulse spectrum tailored to each parcel's crop.
-
-### 4. Real-Time Como Weather & Panola County Cadastral Dossier
-- **Live Como, MS Weather:** Fetches live temperature, wind speed & compass bearing, humidity, and sky condition for Como (`34.5101°N, -89.9401°W`) via Open-Meteo with resilient offline defaults.
-- **Parcel Dossier Drawer:** Displays official Panola County assessor records (`PARNO`, `PLSS`, `Legal Description`, `Site Address`, `2024 Assessed Land Value`, `Surveyed vs. Cultivated Acres`), USDA soil pH/CEC/drainage specs, live **Field Activity Logger**, and one-click **JSON Parcel Export**.
-
-### 5. In-Cab Combine Harvester Driving & RTK AutoTrac Simulator
-- **First-Person Panoramic Windshield:** 60fps perspective view over the real selected MARIS parcel polygon with converging crop rows (white cotton bolls, corn stalks, soybeans, sorghum, or wheat), live harvested stubble swaths, animated 40-ft `RD40F` draper header with spinning pickup reel & hydraulic raise/lower (`4"–44"`), chaff/dust plumes, Day/Dusk mode with LED work-light beams, windshield wiper, and AR windshield guidance corridor.
-- **Right A-Pillar Cornerpost OLED Display:** Live ground speed (`MPH`), drive range (`F1 / F2 / N / R`), engine RPM & load %, coolant °F, live grain tank / cotton basket fill %, header height gauge, shoe & rotor loss monitor, fuel/DEF %, and `SEP / HDR / AUTO / AUG` annunciators.
-- **Interactive Steering, HydroHandle & CommandCenter™ G5 Waypoints:** Drag the 3-spoke steering wheel or drive with `W/A/S/D` & Arrow keys, drop custom waypoints by clicking anywhere on the live parcel map, generate parallel **Auto AB Swaths**, engage **RTK AutoTrac (`P`)** pure-pursuit autopilot with live Cross-Track Error (`XTE`), inspect **Threshing** diagnostics (Dual Rotor RPM, Cleaning Fan RPM, Concave Clearance), and log harvested acreage directly back to the parcel dossier upon exiting.
+| Feature / View | Direct Live URL |
+| --- | --- |
+| Main 3D Satellite Dashboard (Macon, MS) | https://delta-parcel-fms.vercel.app |
+| USGS Water + 1m LiDAR Map Overlays | https://delta-parcel-fms.vercel.app/?overlay=both&healthTab=lidar |
+| Farmer Owner Portal (`My Farm Portal`) | https://delta-parcel-fms.vercel.app/?mode=portal |
+| Parcel Crop Cover & Previous Crops | https://delta-parcel-fms.vercel.app/?drawer=crops |
+| Parcel Docs, Certifications & Soil Tests | https://delta-parcel-fms.vercel.app/?drawer=documents |
+| Tax-Roll Postcard Ownership Claim | https://delta-parcel-fms.vercel.app/?drawer=claim |
+| Ag-Drone Spraying Marketplace | https://delta-parcel-fms.vercel.app/?mode=drone |
+| Drone Vendor Signup & Territory Claim | https://delta-parcel-fms.vercel.app/?mode=drone-vendor |
+| Maximized Map (Bottom Dock Hidden) | https://delta-parcel-fms.vercel.app/?dock=hidden |
 
 ---
 
@@ -77,9 +104,10 @@ Out of the box, the application ships with **120 official cultivated farm parcel
 | Styling | Tailwind CSS v4 + Self-hosted `Plus Jakarta Sans` & `JetBrains Mono` (`@fontsource`) |
 | Mapping & WebGL | MapLibre GL JS `v4.7.1` |
 | Icons | `@phosphor-icons/react` |
-| Cadastral GIS Data | Official Mississippi MARIS 2024 Statewide Parcels (`MS_Parcels_August_2024` / Panola County FIPS `28107`) |
+| Cadastral GIS & Tax Rolls | MS MARIS 2024 (`MS_Parcels_August_2024` incl. `OWNNAME` & `MAILADD1`), Arkansas GIS, Texas StratMap, NC OneMap |
+| Federal Map & Env APIs | USGS 3DEP 1m LiDAR ImageServer, USGS NHD & WBD HUC-12, USGS Water Services (NWIS), FEMA NFHL, NASA Earthdata CMR (GEDI/ICESat-2), NASA GIBS SMAP L4 |
 | Satellite Imagery | Esri World Imagery + World Transportation / Boundaries & Places |
-| Live Weather | Open-Meteo Forecast API (`34.5101°N, -89.9401°W`) |
+| Live Weather | Open-Meteo Forecast API |
 | Hosting | Vercel (static SPA) |
 
 ---
@@ -89,13 +117,16 @@ Out of the box, the application ships with **120 official cultivated farm parcel
 ```text
 delta-parcel-fms/
 ├── docs/
-│   ├── preview-macon.png            # Live Bogue Chitto Gin — Macon, MS dashboard screenshot
-│   ├── preview-combine-cab.png      # In-cab Combine Harvester interior (Daytime Harvest)
-│   ├── preview-combine-dusk.png     # In-cab Combine Harvester interior (Dusk Auto-Harvest)
-│   └── preview.png                  # Live Como, MS dashboard screenshot
+│   ├── preview-macon.png             # Live Bogue Chitto Gin — Macon, MS 3D satellite dashboard
+│   ├── preview-usgs-lidar.png        # Live USGS Water/Drainage + NASA SMAP + 3DEP 1m LiDAR overlays
+│   ├── preview-farmer-portal.png     # Farmer Owner Portal & Farm Management Dashboard
+│   ├── preview-postcard-claim.png    # County Tax Assessor live mailing address & USPS postcard claim
+│   ├── preview-crops-cover.png       # Parcel Crop Cover & Previous Crops Planted rotation manager
+│   ├── preview-drone-marketplace.png # Ag-Drone Spraying Marketplace, RFQs & Exclusive Territory Claims
+│   └── preview.png                   # Como, MS (Panola County) basin dashboard
 ├── public/
 │   ├── assets/
-│   │   └── farmer-avatar.jpg        # Operator profile portrait
+│   │   └── farmer-avatar.jpg
 │   └── data/
 │       ├── bogue-chitto-macon-parcels.geojson
 │       ├── como-ms-parcels.geojson
@@ -103,25 +134,29 @@ delta-parcel-fms/
 │       └── us-cotton-facilities.json
 ├── src/
 │   ├── components/
-│   │   ├── BottomTelemetryDock.tsx  # Fleet wireframes, irrigation offset tuner, live yield spectrum
-│   │   ├── CombineCabSimulator.tsx  # In-cab Cornerpost OLED, steering wheel, HydroHandle & CommandCenter G5
-│   │   ├── CombineWindshieldCanvas.tsx # 60fps panoramic perspective field, 40-ft header & AR HUD renderer
-│   │   ├── InspectorDrawers.tsx     # Cadastral dossier, AI agronomy drawer, equipment dispatch
-│   │   ├── LeftAnalyticsRail.tsx    # Segmented health gauge, trend chart, 16x6 stress heatmap
-│   │   ├── ParcelMapStage.tsx       # MapLibre GL 3D satellite stage, MARIS sync, geodesic plotter
-│   │   └── TopHudBar.tsx            # Live weather pills, parcel/facility search, Drive Combine button
+│   │   ├── BottomTelemetryDock.tsx   # Collapsible dock, changeable equipment HUD, irrigation offsets, drone bar
+│   │   ├── DroneMarketplaceModal.tsx # FAA Part 137 drone directory, multi-parcel RFQs & territory claims
+│   │   ├── FarmerPortalModal.tsx     # Dedicated Farmer Owner Portal (dashboard, rotation matrix, vault, claims)
+│   │   ├── InspectorDrawers.tsx      # 4-tab Parcel Dossier (Overview, Crops & Cover, Docs & Soil, Postcard Claim)
+│   │   ├── LeftAnalyticsRail.tsx     # Health arc gauge, trend chart, Stress / USGS Water / NASA LiDAR map
+│   │   ├── ParcelMapStage.tsx        # MapLibre 3D satellite, federal raster overlays, 498 gins/WH, GIS sync
+│   │   └── TopHudBar.tsx             # Basin/USA switcher, weather, search, My Farm Portal, Plot Parcel
 │   ├── data/
-│   │   ├── msParcels.ts             # MARIS feature hydration, regional soils, fleet & alerts
-│   │   └── regions.ts               # Macon (Noxubee) & Como (Panola) region definitions
+│   │   ├── droneMarketplace.ts       # Regional FAA Part 137 drone vendors & claimable territories
+│   │   ├── equipmentCatalog.ts       # Changeable harvesters, tractors, sprayers & aerial applicators
+│   │   ├── msParcels.ts              # MARIS parcel hydration, soils, yields & alerts
+│   │   ├── parcelOwnerStore.ts       # Crop covers, rotation history, document vault & live MARIS tax-roll lookup
+│   │   └── regions.ts                # Macon (Noxubee) & Como (Panola) basin configs
 │   ├── types/
-│   │   └── farm.ts                  # TypeScript domain models (Parcel, Equipment, CottonFacility, etc.)
+│   │   └── farm.ts                   # Domain models (Parcel, ParcelCropProfile, ParcelDocument, ParcelClaimRecord)
 │   ├── utils/
-│   │   ├── combineSim.ts            # Combine vehicle physics, HarvestGrid & RTK Pure-Pursuit autopilot
-│   │   └── units.ts                 # Geodesic area (spherical excess), bbox, AC/HA & °F/°C formatters
-│   ├── App.tsx                      # State orchestration, MARIS live fetch, Open-Meteo weather
-│   ├── index.css                    # Smoked obsidian glass tokens, fonts, animations
-│   └── main.tsx                     # Application entry point
-├── vercel.json                      # Vercel Vite SPA deployment configuration
+│   │   ├── parcelEnvIntel.ts         # Live USGS NWIS, FEMA NFHL, 3DEP Elevation & NASA CMR LiDAR queries
+│   │   ├── parcelGisSync.ts          # Multi-state live parcel & owner sync (MS, AR, TX, NC)
+│   │   └── units.ts                  # Geodesic acreage, bbox & US/Metric formatters
+│   ├── App.tsx
+│   ├── index.css
+│   └── main.tsx
+├── vercel.json
 ├── vite.config.ts
 └── package.json
 ```
@@ -152,7 +187,7 @@ npm run preview
 ---
 
 ## Data Attribution & Sources
-- **Cadastral Parcel Polygons & Assessor Metadata:** Mississippi Automated Resource Information System (**MARIS**) / MDEQ / Panola County Tax Assessor (`MS_Parcels_August_2024`).
-- **Satellite Base Tiles:** Esri, Maxar, Earthstar Geographics, and the GIS User Community.
-- **Weather Telemetry:** [Open-Meteo](https://open-meteo.com/) real-time forecast API.
-- **Agronomy & Soil Context:** USDA-NRCS MLRA 134 (Southern Mississippi Valley Silty Uplands — Panola County) & Mississippi State University Extension row-crop management baselines.
+- **Cadastral Parcels & Tax Assessor Records:** Mississippi MARIS (`MS_Parcels_August_2024`), Arkansas GIS Office, Texas TNRIS StratMap, and NC OneMap.
+- **Hydrology, Flooding & LiDAR:** USGS National Water Information System (NWIS), USGS National Hydrography Dataset (NHD/WBD), USGS 3D Elevation Program (3DEP), FEMA National Flood Hazard Layer (NFHL), NASA Earthdata CMR (`GEDI L2A`, `ICESat-2 ATL08`), and NASA GIBS (`SMAP L4`).
+- **Cotton Infrastructure:** U.S. Cotton Gins & Warehouses dataset (`cotton-gin-map.vercel.app`) verified against Esri Geocoder, EPA FRS, and county cadastral records.
+- **Satellite Imagery & Weather:** Esri World Imagery / Maxar / Earthstar Geographics and [Open-Meteo](https://open-meteo.com/).
