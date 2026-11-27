@@ -142,6 +142,23 @@ export function App() {
     return [];
   });
   const [activeLayer, setActiveLayer] = useState<MapLayer>('satellite');
+  const [showUsgsWaterOverlay, setShowUsgsWaterOverlay] = useState<boolean>(() => {
+    try {
+      const ov = new URLSearchParams(window.location.search).get('overlay');
+      return ov === 'water' || ov === 'both';
+    } catch {
+      return false;
+    }
+  });
+  const [showLidarOverlay, setShowLidarOverlay] = useState<boolean>(() => {
+    try {
+      const ov = new URLSearchParams(window.location.search).get('overlay');
+      return ov === 'lidar' || ov === 'both';
+    } catch {
+      return false;
+    }
+  });
+  const [lidarOverlayStyle, setLidarOverlayStyle] = useState<'elevation' | 'slope' | 'contours'>('elevation');
   const [unit, setUnit] = useState<AreaUnit>('ac');
   const [hoveredStressCell, setHoveredStressCell] = useState<StressCell | null>(null);
   const [weather, setWeather] = useState<LiveWeather>(DEFAULT_WEATHER);
@@ -594,6 +611,9 @@ export function App() {
         statewideTick={statewideTick}
         nationwideTick={nationwideTick}
         activeLayer={activeLayer}
+        showUsgsWaterOverlay={showUsgsWaterOverlay}
+        showLidarOverlay={showLidarOverlay}
+        lidarOverlayStyle={lidarOverlayStyle}
         showFacilities={showFacilities}
         facilityScope={facilityScope}
         unit={unit}
@@ -610,6 +630,9 @@ export function App() {
           }
         }}
         onChangeLayer={setActiveLayer}
+        onToggleUsgsWaterOverlay={() => setShowUsgsWaterOverlay((v) => !v)}
+        onToggleLidarOverlay={() => setShowLidarOverlay((v) => !v)}
+        onChangeLidarOverlayStyle={setLidarOverlayStyle}
         onToggleFacilities={() => setShowFacilities((v) => !v)}
         onToggleFacilityScope={() => setFacilityScope((s) => (s === 'usa' ? 'ms' : 'usa'))}
         onOpenParcelDetail={() => setParcelDetailOpen(true)}
@@ -630,6 +653,10 @@ export function App() {
             onHoverStressCell={setHoveredStressCell}
             onOpenAIInsights={() => setAiInsightsOpen(true)}
             onOpenParcelDetail={() => setParcelDetailOpen(true)}
+            showUsgsWaterOverlay={showUsgsWaterOverlay}
+            showLidarOverlay={showLidarOverlay}
+            onToggleUsgsWaterOverlay={() => setShowUsgsWaterOverlay((v) => !v)}
+            onToggleLidarOverlay={() => setShowLidarOverlay((v) => !v)}
           />
         </div>
 

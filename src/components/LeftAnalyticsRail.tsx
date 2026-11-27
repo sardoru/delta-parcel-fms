@@ -25,6 +25,10 @@ interface LeftAnalyticsRailProps {
   onHoverStressCell: (cell: StressCell | null) => void;
   onOpenAIInsights: () => void;
   onOpenParcelDetail: () => void;
+  showUsgsWaterOverlay: boolean;
+  showLidarOverlay: boolean;
+  onToggleUsgsWaterOverlay: () => void;
+  onToggleLidarOverlay: () => void;
 }
 
 const SNAPSHOT_DATES = ['November 26', 'November 19', 'November 12'] as const;
@@ -68,6 +72,10 @@ export const LeftAnalyticsRail: React.FC<LeftAnalyticsRailProps> = ({
   onHoverStressCell,
   onOpenAIInsights,
   onOpenParcelDetail,
+  showUsgsWaterOverlay,
+  showLidarOverlay,
+  onToggleUsgsWaterOverlay,
+  onToggleLidarOverlay,
 }) => {
   const [scope, setScope] = useState<'parcel' | 'farm'>('parcel');
   const [timeframe, setTimeframe] = useState<TimeframeKey>('7d');
@@ -610,19 +618,21 @@ export const LeftAnalyticsRail: React.FC<LeftAnalyticsRailProps> = ({
           )}
 
           {healthMode === 'water' && (
-            <div className="mt-2.5 flex items-center justify-between gap-2">
-              <span className="text-[11.5px] font-medium text-[#8cd7f0]">
-                Runoff &amp; Drainage Flow ({envIntel ? `→ ${envIntel.elevation.runoffBearing}` : 'Syncing...'})
+            <div className="mt-2.5 flex items-center justify-between gap-1.5">
+              <span className="truncate text-[11px] font-medium text-[#8cd7f0]">
+                Runoff ({envIntel ? `→ ${envIntel.elevation.runoffBearing}` : '...'}) · Zone {envIntel?.femaFloodZone || 'X'}
               </span>
-              <span
-                className={`rounded-full border px-2 py-0.5 font-mono text-[9.5px] font-semibold ${
-                  envIntel?.isSfhaFloodplain
-                    ? 'border-[#df694a]/50 bg-[#df694a]/16 text-[#ff9d85]'
-                    : 'border-[#63b97a]/40 bg-[#63b97a]/14 text-[#8ee3a4]'
+              <button
+                type="button"
+                onClick={onToggleUsgsWaterOverlay}
+                className={`shrink-0 rounded-full border px-2 py-0.5 font-mono text-[9.5px] font-semibold transition-all ${
+                  showUsgsWaterOverlay
+                    ? 'border-[#5ec8eb] bg-[#5ec8eb] text-[#0c161b]'
+                    : 'border-[#5ec8eb]/45 bg-[#5ec8eb]/12 text-[#8cd7f0] hover:bg-[#5ec8eb]/25'
                 }`}
               >
-                FEMA Zone {envIntel?.femaFloodZone || 'X'}
-              </span>
+                {showUsgsWaterOverlay ? '✓ Map Overlay ON' : '+ Overlay on Map'}
+              </button>
             </div>
           )}
 
@@ -648,9 +658,17 @@ export const LeftAnalyticsRail: React.FC<LeftAnalyticsRailProps> = ({
                   className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[#f0bb66]"
                 />
               </div>
-              <span className="shrink-0 font-mono text-[9.5px] text-[#dce2d4]/60">
-                {envIntel ? `${envIntel.lidarScans.length} scans` : '...'}
-              </span>
+              <button
+                type="button"
+                onClick={onToggleLidarOverlay}
+                className={`shrink-0 rounded-full border px-2 py-0.5 font-mono text-[9.5px] font-semibold transition-all ${
+                  showLidarOverlay
+                    ? 'border-[#f0bb66] bg-[#f0bb66] text-[#181308]'
+                    : 'border-[#f0bb66]/45 bg-[#f0bb66]/12 text-[#f6deb2] hover:bg-[#f0bb66]/25'
+                }`}
+              >
+                {showLidarOverlay ? '✓ On Map' : '+ On Map'}
+              </button>
             </div>
           )}
 

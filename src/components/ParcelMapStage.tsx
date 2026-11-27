@@ -44,6 +44,9 @@ interface ParcelMapStageProps {
   statewideTick: number;
   nationwideTick: number;
   activeLayer: MapLayer;
+  showUsgsWaterOverlay: boolean;
+  showLidarOverlay: boolean;
+  lidarOverlayStyle: 'elevation' | 'slope' | 'contours';
   showFacilities: boolean;
   facilityScope: 'usa' | 'ms';
   unit: AreaUnit;
@@ -54,6 +57,9 @@ interface ParcelMapStageProps {
   onSelectParcel: (parcelId: string, multiSelect?: boolean) => void;
   onSelectFacility: (facility: CottonFacility | null) => void;
   onChangeLayer: (layer: MapLayer) => void;
+  onToggleUsgsWaterOverlay: () => void;
+  onToggleLidarOverlay: () => void;
+  onChangeLidarOverlayStyle: (style: 'elevation' | 'slope' | 'contours') => void;
   onToggleFacilities: () => void;
   onToggleFacilityScope: () => void;
   onOpenParcelDetail: () => void;
@@ -98,6 +104,9 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   statewideTick,
   nationwideTick,
   activeLayer,
+  showUsgsWaterOverlay,
+  showLidarOverlay,
+  lidarOverlayStyle,
   showFacilities,
   facilityScope,
   unit,
@@ -108,6 +117,9 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   onSelectParcel,
   onSelectFacility,
   onChangeLayer,
+  onToggleUsgsWaterOverlay,
+  onToggleLidarOverlay,
+  onChangeLidarOverlayStyle,
   onToggleFacilities,
   onToggleFacilityScope,
   onOpenParcelDetail,
@@ -136,6 +148,12 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   onSelectParcelRef.current = onSelectParcel;
   const onSelectFacilityRef = useRef(onSelectFacility);
   onSelectFacilityRef.current = onSelectFacility;
+  const showUsgsWaterRef = useRef(showUsgsWaterOverlay);
+  showUsgsWaterRef.current = showUsgsWaterOverlay;
+  const showLidarRef = useRef(showLidarOverlay);
+  showLidarRef.current = showLidarOverlay;
+  const lidarStyleRef = useRef(lidarOverlayStyle);
+  lidarStyleRef.current = lidarOverlayStyle;
 
   const [is3D, setIs3D] = useState(true);
   const [hoveredParcelInfo, setHoveredParcelInfo] = useState<{
@@ -335,6 +353,56 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
             tileSize: 256,
             maxzoom: 18,
           },
+          // Live USGS 3DEP 1m LiDAR Heatmaps (Elevation Tinted Hillshade, Slope Runoff Map, 2ft Contours)
+          'usgs-lidar-elevation': {
+            type: 'raster',
+            tiles: [
+              'https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&renderingRule=%7B%22rasterFunction%22%3A%22Hillshade%20Elevation%20Tinted%22%7D&f=image',
+            ],
+            tileSize: 256,
+            maxzoom: 17,
+          },
+          'usgs-lidar-slope': {
+            type: 'raster',
+            tiles: [
+              'https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&renderingRule=%7B%22rasterFunction%22%3A%22Slope%20Map%22%7D&f=image',
+            ],
+            tileSize: 256,
+            maxzoom: 17,
+          },
+          'usgs-lidar-contours': {
+            type: 'raster',
+            tiles: [
+              'https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&renderingRule=%7B%22rasterFunction%22%3A%22Preset%202ft%20Contour%20Interval%22%7D&f=image',
+            ],
+            tileSize: 256,
+            maxzoom: 17,
+          },
+          // Live USGS National Hydrography (Streams/Drainage) + WBD Watersheds + NASA SMAP Soil Moisture Heatmap
+          'nasa-smap-moisture': {
+            type: 'raster',
+            tiles: [
+              'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/SMAP_L4_Analyzed_Surface_Soil_Moisture/default/2026-11-24/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png',
+            ],
+            tileSize: 256,
+            maxzoom: 6,
+          },
+          'usgs-water-nhd': {
+            type: 'raster',
+            tiles: [
+              'https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&f=image',
+            ],
+            tileSize: 256,
+            maxzoom: 17,
+          },
+          'usgs-water-wbd': {
+            type: 'raster',
+            tiles: [
+              'https://hydro.nationalmap.gov/arcgis/rest/services/wbd/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=png32&transparent=true&layers=show:6&f=image',
+            ],
+            tileSize: 256,
+            maxzoom: 15,
+          },
           'como-parcels': {
             type: 'geojson',
             data: parcelsGeoJsonRef.current as unknown as GeoJSON.FeatureCollection,
@@ -358,6 +426,50 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
               'raster-contrast': 0.14,
               'raster-saturation': 0.12,
             },
+          },
+          // USGS 3DEP / NASA LiDAR Heatmap Overlays (lazy-loaded only when toggled ON)
+          {
+            id: 'overlay-lidar-elevation',
+            type: 'raster',
+            source: 'usgs-lidar-elevation',
+            layout: { visibility: 'none' },
+            paint: { 'raster-opacity': 0.68, 'raster-contrast': 0.22 },
+          },
+          {
+            id: 'overlay-lidar-slope',
+            type: 'raster',
+            source: 'usgs-lidar-slope',
+            layout: { visibility: 'none' },
+            paint: { 'raster-opacity': 0.66, 'raster-contrast': 0.18 },
+          },
+          {
+            id: 'overlay-lidar-contours',
+            type: 'raster',
+            source: 'usgs-lidar-contours',
+            layout: { visibility: 'none' },
+            paint: { 'raster-opacity': 0.72 },
+          },
+          // USGS Water / Drainage / NASA SMAP Soil Moisture Heatmap Overlays
+          {
+            id: 'overlay-nasa-smap',
+            type: 'raster',
+            source: 'nasa-smap-moisture',
+            layout: { visibility: 'none' },
+            paint: { 'raster-opacity': 0.42 },
+          },
+          {
+            id: 'overlay-usgs-wbd',
+            type: 'raster',
+            source: 'usgs-water-wbd',
+            layout: { visibility: 'none' },
+            paint: { 'raster-opacity': 0.55 },
+          },
+          {
+            id: 'overlay-usgs-nhd',
+            type: 'raster',
+            source: 'usgs-water-nhd',
+            layout: { visibility: 'none' },
+            paint: { 'raster-opacity': 0.92 },
           },
           {
             id: 'reference-roads',
@@ -596,6 +708,19 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
         src.setData(parcelsGeoJsonRef.current as unknown as GeoJSON.FeatureCollection);
       }
       updateProjectedOverlays();
+      // Apply initial URL-triggered overlays if any
+      const initWater = showUsgsWaterRef.current;
+      const initLidar = showLidarRef.current;
+      const initStyle = lidarStyleRef.current;
+      const sv = (id: string, on: boolean) => {
+        if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+      };
+      sv('overlay-nasa-smap', initWater);
+      sv('overlay-usgs-wbd', initWater);
+      sv('overlay-usgs-nhd', initWater);
+      sv('overlay-lidar-elevation', initLidar && initStyle === 'elevation');
+      sv('overlay-lidar-slope', initLidar && initStyle === 'slope');
+      sv('overlay-lidar-contours', initLidar && initStyle === 'contours');
     });
 
     map.on('move', updateProjectedOverlays);
@@ -873,6 +998,28 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
       map.setPaintProperty('parcels-outline', 'line-color', 'rgba(244, 248, 236, 0.34)');
     }
   }, [activeLayer]);
+
+  // Toggle live USGS Water / Drainage / NASA SMAP & USGS 3DEP LiDAR Heatmap Overlays on the MapLibre stage
+  const syncEnvOverlayVisibility = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !mapReadyRef.current) return;
+    const setVis = (id: string, on: boolean) => {
+      if (map.getLayer(id)) {
+        map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+      }
+    };
+    setVis('overlay-nasa-smap', showUsgsWaterOverlay);
+    setVis('overlay-usgs-wbd', showUsgsWaterOverlay);
+    setVis('overlay-usgs-nhd', showUsgsWaterOverlay);
+
+    setVis('overlay-lidar-elevation', showLidarOverlay && lidarOverlayStyle === 'elevation');
+    setVis('overlay-lidar-slope', showLidarOverlay && lidarOverlayStyle === 'slope');
+    setVis('overlay-lidar-contours', showLidarOverlay && lidarOverlayStyle === 'contours');
+  }, [showUsgsWaterOverlay, showLidarOverlay, lidarOverlayStyle]);
+
+  useEffect(() => {
+    syncEnvOverlayVisibility();
+  }, [syncEnvOverlayVisibility]);
 
   // Update stress zone target overlay immediately on hover
   useEffect(() => {
@@ -1289,8 +1436,8 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
         </button>
       </div>
 
-      {/* Right-Side Layer Switcher Pills (Satellite / NDVI / Soil + Live MARIS Sync) */}
-      <div className="pointer-events-auto fixed right-4 top-[76px] z-20 hidden flex-col items-end gap-2 sm:flex">
+      {/* Right-Side Layer Switcher Pills (Satellite / NDVI / Soil / USGS Water / LiDAR + Live GIS Sync) */}
+      <div className="pointer-events-auto fixed right-4 top-[66px] z-20 hidden flex-col items-end gap-1.5 sm:flex">
         {(
           [
             {
@@ -1316,14 +1463,14 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
               key={item.id}
               type="button"
               onClick={() => onChangeLayer(item.id)}
-              className={`glass-pill flex w-[124px] items-center gap-2.5 rounded-full py-1.5 pl-1.5 pr-4 text-[12px] font-medium transition-all ${
+              className={`glass-pill flex w-[122px] items-center gap-2 rounded-full py-1 pl-1.5 pr-3 text-[11.5px] font-medium transition-all ${
                 active
                   ? 'border-[#d8f274]/60 bg-[#1e231a]/90 text-[#f5f7f1] shadow-[0_8px_24px_-6px_rgba(0,0,0,0.7)]'
                   : 'text-[#dce2d4]/75 hover:border-white/25 hover:text-white'
               }`}
             >
               <span
-                className={`h-7 w-7 shrink-0 rounded-full border ${
+                className={`h-5 w-5 shrink-0 rounded-full border ${
                   active ? 'border-[#d8f274]' : 'border-white/25'
                 }`}
                 style={{ background: item.swatch }}
@@ -1333,40 +1480,111 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
           );
         })}
 
-        {/* U.S. Cotton Gins & Warehouses Layer Toggle + USA/MS Scope */}
+        {/* USGS Water / Drainage / NASA SMAP Soil Moisture Heatmap Overlay Toggle */}
         <button
           type="button"
-          onClick={onToggleFacilities}
-          title="Toggle U.S. Cotton Gins (amber) and Cotton Warehouses (cyan)"
-          className={`glass-pill mt-0.5 flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium transition-all ${
-            showFacilities
-              ? 'border-[#f0bb66]/55 bg-[#201e17]/92 text-[#f6deb2]'
-              : 'text-[#dce2d4]/60 hover:border-white/25 hover:text-white'
+          onClick={onToggleUsgsWaterOverlay}
+          title="Overlay live USGS National Hydrography streams, HUC-12 watersheds & NASA SMAP soil moisture heatmap"
+          className={`glass-pill flex w-[122px] items-center gap-2 rounded-full py-1 pl-1.5 pr-3 text-[11px] font-medium transition-all ${
+            showUsgsWaterOverlay
+              ? 'border-[#5ec8eb]/70 bg-[#102129]/94 text-[#c8f0fc] shadow-[0_8px_24px_-6px_rgba(94,200,235,0.45)]'
+              : 'text-[#dce2d4]/75 hover:border-[#5ec8eb]/45 hover:text-white'
           }`}
         >
-          <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-full bg-[#f0bb66]" />
-            <span className="h-2 w-2 rounded-full bg-[#5ec8eb]" />
-          </span>
-          <span>Gins &amp; WH ({visibleFacilities.length})</span>
+          <span
+            className={`h-5 w-5 shrink-0 rounded-full border ${
+              showUsgsWaterOverlay ? 'border-[#5ec8eb]' : 'border-white/25'
+            }`}
+            style={{
+              background: 'linear-gradient(135deg, #2b65d9 0%, #5ec8eb 58%, #47b59a 100%)',
+            }}
+          />
+          <span className="truncate">USGS Water</span>
         </button>
 
-        {showFacilities && (
+        {/* USGS 3DEP / NASA LiDAR Elevation & Slope Heatmap Overlay Toggle */}
+        <button
+          type="button"
+          onClick={onToggleLidarOverlay}
+          title="Overlay live 1-meter LiDAR Elevation Tinted Hillshade, Slope Runoff Map, or 2ft Contours"
+          className={`glass-pill flex w-[122px] items-center gap-2 rounded-full py-1 pl-1.5 pr-3 text-[11px] font-medium transition-all ${
+            showLidarOverlay
+              ? 'border-[#f0bb66]/70 bg-[#231d11]/94 text-[#f8e1b8] shadow-[0_8px_24px_-6px_rgba(240,187,102,0.45)]'
+              : 'text-[#dce2d4]/75 hover:border-[#f0bb66]/45 hover:text-white'
+          }`}
+        >
+          <span
+            className={`h-5 w-5 shrink-0 rounded-full border ${
+              showLidarOverlay ? 'border-[#f0bb66]' : 'border-white/25'
+            }`}
+            style={{
+              background: 'linear-gradient(135deg, #3b579c 0%, #4fb87d 50%, #f0bd5e 100%)',
+            }}
+          />
+          <span className="truncate">LiDAR Heat</span>
+        </button>
+
+        {/* Sub-style selector when LiDAR Heatmap Overlay is active */}
+        {showLidarOverlay && (
+          <div className="glass-pill flex items-center gap-0.5 rounded-full p-0.5 font-mono text-[9.5px]">
+            {(
+              [
+                { id: 'elevation', label: 'Elev' },
+                { id: 'slope', label: 'Slope' },
+                { id: 'contours', label: '2ft' },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => onChangeLidarOverlayStyle(opt.id)}
+                className={`rounded-full px-2 py-0.5 font-semibold transition-colors ${
+                  lidarOverlayStyle === opt.id
+                    ? 'bg-[#f0bb66] text-[#171209]'
+                    : 'text-[#dce2d4]/70 hover:text-white'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* U.S. Cotton Gins & Warehouses Layer Toggle + USA/MS Scope */}
+        <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={onToggleFacilityScope}
-            title="Switch between all 17 Cotton Belt U.S. states and Mississippi only"
-            className="glass-pill flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px] text-[#dce2d4]/80 hover:border-white/25"
+            onClick={onToggleFacilities}
+            title="Toggle U.S. Cotton Gins (amber) and Cotton Warehouses (cyan)"
+            className={`glass-pill flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10.5px] font-medium transition-all ${
+              showFacilities
+                ? 'border-[#f0bb66]/55 bg-[#201e17]/92 text-[#f6deb2]'
+                : 'text-[#dce2d4]/60 hover:border-white/25 hover:text-white'
+            }`}
           >
-            <span className={facilityScope === 'usa' ? 'text-[#f0bb66] font-semibold' : 'text-[#dce2d4]/45'}>
-              USA
+            <span className="flex items-center gap-0.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#f0bb66]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-[#5ec8eb]" />
             </span>
-            <span className="text-white/25">/</span>
-            <span className={facilityScope === 'ms' ? 'text-[#d8f274] font-semibold' : 'text-[#dce2d4]/45'}>
-              MS
-            </span>
+            <span>Gins ({visibleFacilities.length})</span>
           </button>
-        )}
+          {showFacilities && (
+            <button
+              type="button"
+              onClick={onToggleFacilityScope}
+              title="Switch between all 17 Cotton Belt U.S. states and Mississippi only"
+              className="glass-pill flex items-center gap-1 rounded-full px-2 py-1 font-mono text-[9.5px] text-[#dce2d4]/80 hover:border-white/25"
+            >
+              <span className={facilityScope === 'usa' ? 'text-[#f0bb66] font-semibold' : 'text-[#dce2d4]/45'}>
+                US
+              </span>
+              <span className="text-white/25">/</span>
+              <span className={facilityScope === 'ms' ? 'text-[#d8f274] font-semibold' : 'text-[#dce2d4]/45'}>
+                MS
+              </span>
+            </button>
+          )}
+        </div>
 
         {/* Live Statewide GIS Parcel Pull Button (MARIS MS / AR GIS / TX StratMap / NC OneMap) */}
         <button
@@ -1374,57 +1592,97 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
           onClick={handleTriggerMarisSync}
           disabled={isSyncingMaris}
           title="Sync real nearby farm parcel plots & county ownership (MARIS MS, AR GIS, TX StratMap, NC OneMap)"
-          className="glass-pill mt-1 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium text-[#d8f274] transition-colors hover:border-[#d8f274]/55 hover:bg-[#1f241b]/95 disabled:opacity-60"
+          className="glass-pill flex items-center gap-1.5 rounded-full px-3 py-1 text-[10.5px] font-medium text-[#d8f274] transition-colors hover:border-[#d8f274]/55 hover:bg-[#1f241b]/95 disabled:opacity-60"
         >
-          <ArrowsClockwise size={13} className={isSyncingMaris ? 'animate-spin' : ''} />
+          <ArrowsClockwise size={12} className={isSyncingMaris ? 'animate-spin' : ''} />
           <span>{isSyncingMaris ? 'Syncing GIS...' : 'Sync Nearby GIS'}</span>
         </button>
 
         {marisSyncMessage && (
-          <div className="glass-panel max-w-[210px] rounded-xl px-2.5 py-1.5 text-right text-[10px] leading-snug text-[#dce2d4]/88">
+          <div className="glass-panel max-w-[200px] rounded-xl px-2.5 py-1.5 text-right text-[9.5px] leading-snug text-[#dce2d4]/88">
             {marisSyncMessage}
-          </div>
-        )}
-
-        {/* Active Layer Legend Pill for NDVI / Soil */}
-        {activeLayer !== 'satellite' && (
-          <div className="glass-panel mt-0.5 w-[156px] rounded-2xl p-2.5 text-[10px]">
-            <div className="font-semibold text-[#f3f5ef]">
-              {activeLayer === 'ndvi' ? 'NDVI Vigor Scale' : region.soilRegionLabel}
-            </div>
-            {activeLayer === 'ndvi' ? (
-              <>
-                <div
-                  className="mt-1.5 h-2 w-full rounded-full"
-                  style={{
-                    background:
-                      'linear-gradient(90deg, #d9694a 0%, #e6a84c 42%, #d8f274 72%, #2fb968 100%)',
-                  }}
-                />
-                <div className="mt-1 flex justify-between font-mono text-[9.5px] text-[#dce2d4]/60">
-                  <span>0.34</span>
-                  <span>0.92</span>
-                </div>
-              </>
-            ) : (
-              <div className="mt-1.5 space-y-1 text-[9.5px] text-[#dce2d4]/75">
-                {region.soilLegend.map((item) => (
-                  <div key={item.name} className="flex items-center gap-1.5">
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="truncate">{item.name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>
 
+      {/* Floating Map Overlay Legend (positioned cleanly beside the Zoom capsule above Hide Dock) */}
+      {(activeLayer !== 'satellite' || showUsgsWaterOverlay || showLidarOverlay) && (
+        <div className="glass-panel pointer-events-auto fixed bottom-[336px] right-[62px] z-20 hidden w-[166px] space-y-2 rounded-2xl p-2.5 text-[10px] sm:block">
+            {showUsgsWaterOverlay && (
+              <div>
+                <div className="font-semibold text-[#8cd7f0]">USGS Water + NASA SMAP</div>
+                <div
+                  className="mt-1 h-1.5 w-full rounded-full"
+                  style={{
+                    background: 'linear-gradient(90deg, #47b59a 0%, #5ec8eb 52%, #2b65d9 100%)',
+                  }}
+                />
+                <div className="mt-0.5 flex justify-between font-mono text-[9px] text-[#dce2d4]/60">
+                  <span>Dry Soil</span>
+                  <span>Streams / Wet</span>
+                </div>
+              </div>
+            )}
+            {showLidarOverlay && (
+              <div>
+                <div className="font-semibold text-[#f6deb2]">
+                  {lidarOverlayStyle === 'elevation'
+                    ? '3DEP 1m LiDAR Elevation'
+                    : lidarOverlayStyle === 'slope'
+                    ? '1m LiDAR Slope / Runoff'
+                    : '3DEP 2ft Drainage Contours'}
+                </div>
+                <div
+                  className="mt-1 h-1.5 w-full rounded-full"
+                  style={{
+                    background: 'linear-gradient(90deg, #3b579c 0%, #368d9e 35%, #4fb87d 68%, #f0bd5e 100%)',
+                  }}
+                />
+                <div className="mt-0.5 flex justify-between font-mono text-[9px] text-[#dce2d4]/60">
+                  <span>Low / Flat</span>
+                  <span>High / Steep</span>
+                </div>
+              </div>
+            )}
+            {activeLayer !== 'satellite' && (
+              <div>
+                <div className="font-semibold text-[#f3f5ef]">
+                  {activeLayer === 'ndvi' ? 'NDVI Vigor Scale' : region.soilRegionLabel}
+                </div>
+                {activeLayer === 'ndvi' ? (
+                  <>
+                    <div
+                      className="mt-1 h-1.5 w-full rounded-full"
+                      style={{
+                        background:
+                          'linear-gradient(90deg, #d9694a 0%, #e6a84c 42%, #d8f274 72%, #2fb968 100%)',
+                      }}
+                    />
+                    <div className="mt-0.5 flex justify-between font-mono text-[9px] text-[#dce2d4]/60">
+                      <span>0.34</span>
+                      <span>0.92</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-1 space-y-1 text-[9.5px] text-[#dce2d4]/75">
+                    {region.soilLegend.map((item) => (
+                      <div key={item.name} className="flex items-center gap-1.5">
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span className="truncate">{item.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
       {/* Bottom-Right Vertical Map Zoom/3D/Compass Controls Capsule */}
-      <div className="pointer-events-auto fixed bottom-[292px] right-4 z-20 hidden flex-col items-center gap-1 rounded-full border border-white/12 bg-[#171a15]/82 p-1.5 backdrop-blur-xl xl:flex">
+      <div className="pointer-events-auto fixed bottom-[332px] right-4 z-20 hidden flex-col items-center gap-1 rounded-full border border-white/12 bg-[#171a15]/82 p-1.5 backdrop-blur-xl xl:flex">
         <button
           type="button"
           onClick={handleToggle3D}
