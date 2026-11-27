@@ -119,11 +119,11 @@ export const ParcelDetailDrawer: React.FC<ParcelDetailDrawerProps> = ({
             </div>
           </div>
 
-          {/* Official Panola County MARIS Cadastral Record */}
+          {/* Official Mississippi County MARIS Cadastral Record */}
           <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-3.5">
             <div className="flex items-center justify-between">
               <h3 className="text-[12.5px] font-semibold text-[#f3f5ef]">
-                Panola County Cadastral Record
+                {parcel.county.split(',')[0]} Cadastral Record
               </h3>
               <span className="rounded-full bg-[#d8f274]/14 px-2 py-0.5 font-mono text-[9.5px] text-[#d8f274]">
                 {parcel.source}
@@ -142,6 +142,14 @@ export const ParcelDetailDrawer: React.FC<ParcelDetailDrawerProps> = ({
                 <span className="text-[#dce2d4]/55">Location</span>
                 <span className="text-right text-[#e5eae0]">{parcel.siteAddress}</span>
               </div>
+              {parcel.distanceToLandmarkMiles !== undefined && parcel.landmarkName && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-[#dce2d4]/55">Haul to {parcel.landmarkName}</span>
+                  <span className="font-mono font-semibold text-[#f0bb66]">
+                    {parcel.distanceToLandmarkMiles} mi
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between gap-2">
                 <span className="text-[#dce2d4]/55">GPS Centroid</span>
                 <span className="font-mono text-[#dce2d4]/80">

@@ -242,7 +242,9 @@ export const LeftAnalyticsRail: React.FC<LeftAnalyticsRailProps> = ({
                 : 'Total surveyed area'}
             </div>
             <div className="mt-1 font-mono text-[10px] text-[#dce2d4]/42">
-              {scope === 'parcel' ? selectedParcel.plss : `Panola Co. · ${parcels.length} plots`}
+              {scope === 'parcel'
+                ? selectedParcel.plss
+                : `${selectedParcel.county.split(' ')[0]} Co. · ${parcels.length} plots`}
             </div>
           </div>
         </div>

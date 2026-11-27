@@ -1,6 +1,33 @@
 export type MapLayer = 'satellite' | 'ndvi' | 'soil';
 export type AreaUnit = 'ac' | 'ha';
 export type TimeframeKey = '7d' | '14d' | '30d';
+export type RegionId = 'macon' | 'como';
+
+export interface RegionLandmark {
+  name: string;
+  subtitle: string;
+  address: string;
+  lng: number;
+  lat: number;
+}
+
+export interface RegionConfig {
+  id: RegionId;
+  shortLabel: string;
+  title: string;
+  countyLabel: string;
+  fips: string;
+  zip: string;
+  soilRegionLabel: string;
+  geojsonUrl: string;
+  marisLayerId: 1 | 2;
+  defaultParcelId: string;
+  weatherLat: number;
+  weatherLng: number;
+  defaultCenter: [number, number];
+  landmark?: RegionLandmark;
+  soilLegend: { name: string; color: string }[];
+}
 
 export interface LngLat {
   lng: number;
@@ -108,6 +135,8 @@ export interface Parcel {
   center: LngLat;
   bbox: [number, number, number, number]; // [minLng, minLat, maxLng, maxLat]
   geometry: GeoGeometry;
+  distanceToLandmarkMiles?: number;
+  landmarkName?: string;
   healthTrend: Record<TimeframeKey, { label: string; score: number; ndvi: number; baseline: number }[]>;
   stressGrid: StressCell[];
   irrigationOffsets: IrrigationZoneOffset[];

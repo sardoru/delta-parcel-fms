@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   hydrateMarisFeature,
-  INITIAL_ALERTS,
-  INITIAL_EQUIPMENT,
-} from './data/comoParcels';
+  REGION_ALERTS,
+  REGION_EQUIPMENT,
+} from './data/msParcels';
+import { MS_REGIONS } from './data/regions';
 import {
   AreaUnit,
   EquipmentUnit,
@@ -14,6 +15,7 @@ import {
   MapLayer,
   Parcel,
   RawMarisProperties,
+  RegionId,
   StressCell,
 } from './types/farm';
 import {
@@ -32,10 +34,10 @@ import {
   ParcelDetailDrawer,
 } from './components/InspectorDrawers';
 
-const CUSTOM_PLOTS_KEY = 'deltaplot_como_custom_v1';
+const CUSTOM_PLOTS_PREFIX = 'deltaplot_ms_custom_v2_';
 
-const DEFAULT_COMO_WEATHER: LiveWeather = {
-  tempF: 63,
+const DEFAULT_WEATHER: LiveWeather = {
+  tempF: 62,
   windMph: 8,
   windDir: 'SSW',
   humidityPct: 64,
@@ -43,9 +45,9 @@ const DEFAULT_COMO_WEATHER: LiveWeather = {
   isLive: false,
 };
 
-function loadCustomParcels(): Parcel[] {
+function loadCustomParcels(regionId: RegionId): Parcel[] {
   try {
-    const raw = localStorage.getItem(CUSTOM_PLOTS_KEY);
+    const raw = localStorage.getItem(`${CUSTOM_PLOTS_PREFIX}${regionId}`);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -55,14 +57,19 @@ function loadCustomParcels(): Parcel[] {
 }
 
 export function App() {
+  const [regionId, setRegionId] = useState<RegionId>('macon');
+  const region = MS_REGIONS[regionId];
+
+  const [regionCache, setRegionCache] = useState<Partial<Record<RegionId, Parcel[]>>>({});
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [loadingParcels, setLoadingParcels] = useState(true);
-  const [equipment, setEquipment] = useState<EquipmentUnit[]>(INITIAL_EQUIPMENT);
-  const [selectedParcelId, setSelectedParcelId] = useState<string>('como-1039-3200000-0000100');
+  const [equipmentByRegion, setEquipmentByRegion] =
+    useState<Record<RegionId, EquipmentUnit[]>>(REGION_EQUIPMENT);
+  const [selectedParcelId, setSelectedParcelId] = useState<string>(MS_REGIONS.macon.defaultParcelId);
   const [activeLayer, setActiveLayer] = useState<MapLayer>('satellite');
   const [unit, setUnit] = useState<AreaUnit>('ac');
   const [hoveredStressCell, setHoveredStressCell] = useState<StressCell | null>(null);
-  const [weather, setWeather] = useState<LiveWeather>(DEFAULT_COMO_WEATHER);
+  const [weather, setWeather] = useState<LiveWeather>(DEFAULT_WEATHER);
 
   const [isDrawingPlot, setIsDrawingPlot] = useState(false);
   const [isSyncingMaris, setIsSyncingMaris] = useState(false);
@@ -71,37 +78,64 @@ export function App() {
   const [aiInsightsOpen, setAiInsightsOpen] = useState(false);
   const [inspectedEquipmentId, setInspectedEquipmentId] = useState<string | null>(null);
 
-  // Load 120 real surveyed 2024 MARIS Como, MS farm parcels + any user-plotted custom parcels
+  const cacheRef = useRef(regionCache);
+  cacheRef.current = regionCache;
+
+  // Load 120 official MARIS 2024 parcels for the active Mississippi region (Macon / Como)
   useEffect(() => {
     let active = true;
-    fetch('/data/como-ms-parcels.geojson')
+    const cfg = MS_REGIONS[regionId];
+    setMarisSyncMessage(null);
+    setHoveredStressCell(null);
+    setIsDrawingPlot(false);
+
+    const cached = cacheRef.current[regionId];
+    if (cached && cached.length > 0) {
+      setParcels(cached);
+      setSelectedParcelId(
+        cached.some((p) => p.id === cfg.defaultParcelId) ? cfg.defaultParcelId : cached[0].id
+      );
+      setLoadingParcels(false);
+      return;
+    }
+
+    setLoadingParcels(true);
+    fetch(cfg.geojsonUrl)
       .then((r) => r.json())
       .then((fc: { features: { properties: RawMarisProperties; geometry: GeoGeometry }[] }) => {
         if (!active) return;
-        const hydrated = (fc.features || []).map((f) => hydrateMarisFeature(f, 'MARIS 2024'));
-        const custom = loadCustomParcels();
+        const hydrated = (fc.features || []).map((f) =>
+          hydrateMarisFeature(f, regionId, 'MARIS 2024')
+        );
+        const custom = loadCustomParcels(regionId);
         const combined = [...custom, ...hydrated];
+        setRegionCache((prev) => ({ ...prev, [regionId]: combined }));
         setParcels(combined);
-        if (combined.length > 0 && !combined.some((p) => p.id === 'como-1039-3200000-0000100')) {
-          setSelectedParcelId(combined[0].id);
-        }
+        setSelectedParcelId(
+          combined.some((p) => p.id === cfg.defaultParcelId)
+            ? cfg.defaultParcelId
+            : combined[0]?.id ?? ''
+        );
         setLoadingParcels(false);
       })
       .catch(() => {
         if (active) setLoadingParcels(false);
       });
+
     return () => {
       active = false;
     };
-  }, []);
+  }, [regionId]);
 
-  // Fetch real live weather for Como, MS (34.5101° N, -89.9401° W) from Open-Meteo
+  // Fetch real live weather for the active Mississippi basin (Macon / Como)
   useEffect(() => {
+    let active = true;
     fetch(
-      'https://api.open-meteo.com/v1/forecast?latitude=34.5101&longitude=-89.9401&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m&temperature_unit=fahrenheit&wind_speed_unit=mph'
+      `https://api.open-meteo.com/v1/forecast?latitude=${region.weatherLat}&longitude=${region.weatherLng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`
     )
       .then((r) => r.json())
       .then((data) => {
+        if (!active) return;
         const cur = data?.current;
         if (!cur) return;
         setWeather({
@@ -114,9 +148,15 @@ export function App() {
         });
       })
       .catch(() => {
-        // fallback weather already active
+        // retain default/last weather
       });
-  }, []);
+    return () => {
+      active = false;
+    };
+  }, [region.weatherLat, region.weatherLng]);
+
+  const equipment = equipmentByRegion[regionId];
+  const alerts = REGION_ALERTS[regionId];
 
   const selectedParcel = useMemo(
     () => parcels.find((p) => p.id === selectedParcelId) ?? parcels[0],
@@ -128,7 +168,18 @@ export function App() {
     [equipment, inspectedEquipmentId]
   );
 
-  // Live query official Mississippi MARIS 2024 Cadastral ArcGIS Server for the visible viewport!
+  const updateParcels = useCallback(
+    (updater: (prev: Parcel[]) => Parcel[]) => {
+      setParcels((prev) => {
+        const next = updater(prev);
+        setRegionCache((c) => ({ ...c, [regionId]: next }));
+        return next;
+      });
+    },
+    [regionId]
+  );
+
+  // Live query official Mississippi MARIS 2024 Cadastral ArcGIS Server (East Layer 2 for Macon, West Layer 1 for Como)
   const handleSyncMarisBounds = useCallback(
     async (bounds: { west: number; south: number; east: number; north: number }) => {
       setIsSyncingMaris(true);
@@ -145,7 +196,7 @@ export function App() {
           outSR: '4326',
           f: 'geojson',
         });
-        const url = `https://gis.mississippi.edu/server/rest/services/Cadastral/MS_Parcels_August_2024/MapServer/1/query?${params.toString()}`;
+        const url = `https://gis.mississippi.edu/server/rest/services/Cadastral/MS_Parcels_August_2024/MapServer/${region.marisLayerId}/query?${params.toString()}`;
         const res = await fetch(url);
         const fc = await res.json();
         const incoming: Parcel[] = (fc.features || [])
@@ -163,24 +214,24 @@ export function App() {
               twsp: String(p.TWSP || '').trim(),
               range: String(p.RANGE || '').trim(),
               siteadd: String(p.SITEADD || '').trim(),
-              szip: String(p.SZIP || '38619').trim(),
+              szip: String(p.SZIP || region.zip).trim(),
               gisAcres: Number(Number(p.GISACRES || 0).toFixed(1)),
               taxAcres: Number(Number(p.TAXACRES || 0).toFixed(1)),
               cultAcres: Number((Number(p.CULT_AC1 || 0) + Number(p.CULT_AC2 || 0)).toFixed(1)),
               uncultAcres: Number(Number(p.UNCULT_AC1 || 0).toFixed(1)),
               legldesc: String(p.LEGLDESC || '').replace(/\s+/g, ' ').trim(),
-              cntyname: String(p.CNTYNAME || 'PANOLA').trim(),
-              lat: Number(p.LATDEC || 34.51),
-              lng: Number(p.LONGDEC || -89.94),
+              cntyname: String(p.CNTYNAME || region.countyLabel.split(' ')[0].toUpperCase()).trim(),
+              lat: Number(p.LATDEC || region.weatherLat),
+              lng: Number(p.LONGDEC || region.weatherLng),
               taxyear: String(p.TAXYEAR || '2024').trim(),
               landVal: Number(p.LANDVAL || 0),
               totVal: Number(p.TOTVAL || 0),
             };
-            return hydrateMarisFeature({ properties: rawProps, geometry: f.geometry }, 'MARIS Live');
+            return hydrateMarisFeature({ properties: rawProps, geometry: f.geometry }, regionId, 'MARIS Live');
           });
 
         let addedCount = 0;
-        setParcels((prev) => {
+        updateParcels((prev) => {
           const existingIds = new Set(prev.map((x) => x.id));
           const novel = incoming.filter((x) => !existingIds.has(x.id));
           addedCount = novel.length;
@@ -190,20 +241,20 @@ export function App() {
         setMarisSyncMessage(
           addedCount > 0
             ? `Synced +${addedCount} live MARIS parcels`
-            : `All ${incoming.length} farm parcels in view already loaded`
+            : `All ${incoming.length} farm parcels in view loaded`
         );
       } catch {
-        setMarisSyncMessage('MARIS GIS unavailable — showing local 120 Como parcels');
+        setMarisSyncMessage(`MARIS GIS busy — showing 120 ${region.id === 'macon' ? 'Macon' : 'Como'} parcels`);
       } finally {
         setIsSyncingMaris(false);
       }
     },
-    []
+    [region, regionId, updateParcels]
   );
 
   const handleAdjustIrrigationZone = (zoneId: string) => {
     if (!selectedParcel) return;
-    setParcels((prev) =>
+    updateParcels((prev) =>
       prev.map((parcel) => {
         if (parcel.id !== selectedParcel.id) return parcel;
         return {
@@ -219,7 +270,7 @@ export function App() {
   };
 
   const handleAddLog = (parcelId: string, entry: Omit<FieldLogEntry, 'id'>) => {
-    setParcels((prev) =>
+    updateParcels((prev) =>
       prev.map((p) =>
         p.id === parcelId
           ? {
@@ -246,14 +297,13 @@ export function App() {
     const parno = `CUSTOM ${Math.floor(1000 + Math.random() * 8999)}`;
     const newParcel: Parcel = {
       ...selectedParcel,
-      id: `como-custom-${Date.now()}`,
+      id: `${regionId}-custom-${Date.now()}`,
       name: payload.name,
       parno,
       fsaTract: `PARNO ${parno}`,
       county: payload.county,
-      cityState: 'Como, MS 38619',
-      siteAddress: 'Custom Surveyed Sub-Plot · Como, MS',
-      plss: 'Sec 32 · T06S · R07W',
+      cityState: regionId === 'macon' ? 'Macon, MS 39341' : 'Como, MS 38619',
+      siteAddress: `Custom Surveyed Sub-Plot · ${regionId === 'macon' ? 'Macon, MS' : 'Como, MS'}`,
       legalDesc: `${payload.areaAcres} AC USER SURVEYED POLYGON`,
       source: 'User Surveyed',
       crop: payload.crop,
@@ -271,20 +321,20 @@ export function App() {
       logs: [
         {
           id: `log-init-${Date.now()}`,
-          date: 'Nov 26 · Now',
+          date: 'Nov 27 · Now',
           category: 'Scouting',
-          title: 'Custom Como Parcel Surveyed',
+          title: `Custom ${regionId === 'macon' ? 'Macon' : 'Como'} Parcel Surveyed`,
           operator: 'Caleb Vance',
           detail: `Plotted ${payload.areaAcres} geodesic acres (${payload.soilSeries}, ${payload.irrigationMethod}).`,
         },
       ],
     };
 
-    setParcels((prev) => {
+    updateParcels((prev) => {
       const next = [newParcel, ...prev];
       try {
         const customOnly = next.filter((p) => p.source === 'User Surveyed');
-        localStorage.setItem(CUSTOM_PLOTS_KEY, JSON.stringify(customOnly));
+        localStorage.setItem(`${CUSTOM_PLOTS_PREFIX}${regionId}`, JSON.stringify(customOnly));
       } catch {
         // ignore storage quota
       }
@@ -296,8 +346,9 @@ export function App() {
 
   const handleReassignEquipment = (eqId: string, parcelId: string) => {
     const targetParcel = parcels.find((p) => p.id === parcelId);
-    setEquipment((prev) =>
-      prev.map((eq) =>
+    setEquipmentByRegion((prev) => ({
+      ...prev,
+      [regionId]: prev[regionId].map((eq) =>
         eq.id === eqId
           ? {
               ...eq,
@@ -307,8 +358,8 @@ export function App() {
                 : eq.currentTask,
             }
           : eq
-      )
-    );
+      ),
+    }));
     if (targetParcel) {
       setSelectedParcelId(targetParcel.id);
     }
@@ -319,10 +370,10 @@ export function App() {
       <div className="flex h-[100dvh] w-full items-center justify-center bg-[#10130f] text-[#dce2d4]">
         <div className="glass-panel rounded-2xl px-6 py-4 text-center">
           <div className="text-[15px] font-semibold text-[#d8f274]">
-            Loading Como, MS Cadastral Parcels...
+            Loading {region.title} Parcels...
           </div>
           <div className="mt-1 font-mono text-[11px] text-[#dce2d4]/60">
-            Panola County · MARIS 2024 Statewide GIS
+            {region.countyLabel} · MARIS 2024 Statewide GIS
           </div>
         </div>
       </div>
@@ -331,8 +382,9 @@ export function App() {
 
   return (
     <div className="relative min-h-[100dvh] w-full overflow-x-hidden bg-[#10130f]">
-      {/* Real 3D-Tilted MapLibre Satellite Stage with 120+ Official Como, MS Parcels */}
+      {/* Real 3D-Tilted MapLibre Satellite Stage with Official MARIS 2024 Parcels */}
       <ParcelMapStage
+        region={region}
         parcels={parcels}
         selectedParcel={selectedParcel}
         activeLayer={activeLayer}
@@ -370,10 +422,12 @@ export function App() {
         {/* Right Main Space: Top HUD Bar + Open Interactive Map Window + Bottom Telemetry Dock */}
         <div className="order-1 flex w-full min-w-0 max-w-full flex-1 flex-col justify-between gap-3 lg:order-2">
           <TopHudBar
+            region={region}
+            onChangeRegion={setRegionId}
             parcels={parcels}
             equipment={equipment}
             selectedParcel={selectedParcel}
-            alerts={INITIAL_ALERTS}
+            alerts={alerts}
             weather={weather}
             unit={unit}
             onToggleUnit={() => setUnit((u) => (u === 'ac' ? 'ha' : 'ac'))}
@@ -440,7 +494,7 @@ export function App() {
           onClose={() => setAiInsightsOpen(false)}
           onPromoteToLog={(parcelId, title, detail) =>
             handleAddLog(parcelId, {
-              date: 'Nov 26 · Scheduled',
+              date: 'Nov 27 · Scheduled',
               category: 'Application',
               title,
               operator: 'Caleb Vance (AI Plan)',

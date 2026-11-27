@@ -14,10 +14,21 @@ import {
   MapPinArea,
   Tractor,
 } from '@phosphor-icons/react';
-import { AreaUnit, DeltaAlert, EquipmentUnit, LiveWeather, Parcel } from '../types/farm';
+import {
+  AreaUnit,
+  DeltaAlert,
+  EquipmentUnit,
+  LiveWeather,
+  Parcel,
+  RegionConfig,
+  RegionId,
+} from '../types/farm';
+import { MS_REGIONS } from '../data/regions';
 import { formatArea, formatTemp, formatWind } from '../utils/units';
 
 interface TopHudBarProps {
+  region: RegionConfig;
+  onChangeRegion: (id: RegionId) => void;
   parcels: Parcel[];
   equipment: EquipmentUnit[];
   selectedParcel: Parcel;
@@ -32,6 +43,8 @@ interface TopHudBarProps {
 }
 
 export const TopHudBar: React.FC<TopHudBarProps> = ({
+  region,
+  onChangeRegion,
   parcels,
   equipment,
   selectedParcel,
@@ -95,15 +108,39 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
 
   return (
     <header className="pointer-events-none flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
-      {/* Left: Brand Title + Weather Pills */}
+      {/* Left: Brand Title + Region Switcher + Weather Pills */}
       <div className="pointer-events-auto flex min-w-0 flex-col gap-2">
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <h1 className="truncate text-[20px] font-semibold tracking-[-0.025em] text-[#f5f7f1] drop-shadow-[0_2px_10px_rgba(0,0,0,0.6)] sm:text-[23px]">
-            Como, MS Farm Management
+            {region.title}
           </h1>
-          <span className="hidden shrink-0 items-center rounded-full border border-white/15 bg-black/40 px-2.5 py-0.5 text-[10.5px] font-medium text-[#d8f274] backdrop-blur-md 2xl:inline-flex">
-            Panola County · MARIS 2024
-          </span>
+
+          {/* Mississippi Basin Switcher (Macon / Bogue Chitto Gin ↔ Como / Panola) */}
+          <div
+            role="tablist"
+            aria-label="Switch Mississippi farm basin"
+            className="glass-pill inline-flex shrink-0 items-center rounded-full p-0.5 text-[11px]"
+          >
+            {(['macon', 'como'] as RegionId[]).map((rid) => {
+              const active = region.id === rid;
+              return (
+                <button
+                  key={rid}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => onChangeRegion(rid)}
+                  className={`rounded-full px-2.5 py-1 font-medium transition-all ${
+                    active
+                      ? 'bg-[#d8f274] text-[#141710] shadow-sm'
+                      : 'text-[#dce2d4]/72 hover:text-white'
+                  }`}
+                >
+                  {MS_REGIONS[rid].shortLabel}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Live Como Weather Pills Row */}
@@ -153,7 +190,7 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
                 setSearchQuery(e.target.value);
                 setSearchOpen(true);
               }}
-              placeholder="Search Como parcels, PARNO..."
+              placeholder={`Search ${region.id === 'macon' ? 'Macon' : 'Como'} parcels, PARNO...`}
               aria-label="Search Mississippi farm parcels and equipment"
               className="w-full bg-transparent text-[13px] text-[#f3f5ef] placeholder:text-[#dce2d4]/55 focus:outline-none"
             />
@@ -374,11 +411,15 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
               <div className="mt-3 space-y-1.5 border-t border-white/10 pt-2.5 text-[11.5px] text-[#dce2d4]/75">
                 <div className="flex justify-between">
                   <span className="text-[#dce2d4]/50">HQ Basin</span>
-                  <span>Como, MS 38619</span>
+                  <span>
+                    {region.id === 'macon' ? 'Macon, MS 39341' : 'Como, MS 38619'}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#dce2d4]/50">County GIS</span>
-                  <span className="font-mono text-[#d8f274]">Panola (FIPS 28107)</span>
+                  <span className="font-mono text-[#d8f274]">
+                    {region.countyLabel.split(' ')[0]} (FIPS {region.fips})
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#dce2d4]/50">Loaded Parcels</span>

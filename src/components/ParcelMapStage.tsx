@@ -13,15 +13,17 @@ import {
   Compass,
   CornersOut,
   Cube,
+  Factory,
   Leaf,
   Minus,
   Plus,
   Trash,
 } from '@phosphor-icons/react';
-import { AreaUnit, GeoGeometry, LngLat, MapLayer, Parcel, StressCell } from '../types/farm';
+import { AreaUnit, GeoGeometry, LngLat, MapLayer, Parcel, RegionConfig, StressCell } from '../types/farm';
 import { computeGeodesicAcres, formatArea } from '../utils/units';
 
 interface ParcelMapStageProps {
+  region: RegionConfig;
   parcels: Parcel[];
   selectedParcel: Parcel;
   activeLayer: MapLayer;
@@ -47,8 +49,6 @@ interface ParcelMapStageProps {
   onCancelDrawPlot: () => void;
 }
 
-const COMO_CENTER: [number, number] = [-89.9565, 34.5125];
-
 function ndviFillColor(ndvi: number): string {
   if (ndvi >= 0.85) return '#2fb968';
   if (ndvi >= 0.79) return '#89db58';
@@ -58,6 +58,7 @@ function ndviFillColor(ndvi: number): string {
 }
 
 export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
+  region,
   parcels,
   selectedParcel,
   activeLayer,
@@ -77,8 +78,11 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   const mapRef = useRef<MapLibreMap | null>(null);
   const mapReadyRef = useRef(false);
   const calloutRef = useRef<HTMLDivElement>(null);
+  const landmarkRef = useRef<HTMLDivElement>(null);
   const stressMarkerRef = useRef<HTMLDivElement>(null);
 
+  const regionRef = useRef(region);
+  regionRef.current = region;
   const selectedParcelRef = useRef(selectedParcel);
   selectedParcelRef.current = selectedParcel;
   const hoveredStressRef = useRef(hoveredStressCell);
@@ -98,10 +102,19 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
 
   // Interactive geodesic parcel plotter state
   const [draftPoints, setDraftPoints] = useState<LngLat[]>([]);
-  const [draftName, setDraftName] = useState('Como South 80 Plot');
-  const [draftCrop, setDraftCrop] = useState<Parcel['crop']>('Soybeans');
-  const [draftSoil, setDraftSoil] = useState('Memphis Silt Loam');
+  const [draftName, setDraftName] = useState(
+    region.id === 'macon' ? 'Deerbrook Cotton Sub-Plot' : 'Como South 80 Plot'
+  );
+  const [draftCrop, setDraftCrop] = useState<Parcel['crop']>(
+    region.id === 'macon' ? 'Upland Cotton' : 'Soybeans'
+  );
+  const [draftSoil, setDraftSoil] = useState(region.soilLegend[0]?.name || 'Brooksville Silty Clay');
   const [draftIrrigation, setDraftIrrigation] = useState('Furrow Poly-Pipe');
+
+  useEffect(() => {
+    setDraftName(region.id === 'macon' ? 'Deerbrook Cotton Sub-Plot' : 'Como South 80 Plot');
+    setDraftSoil(region.soilLegend[0]?.name || 'Brooksville Silty Clay');
+  }, [region]);
 
   useEffect(() => {
     if (!isDrawingPlot) setDraftPoints([]);
@@ -109,7 +122,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
 
   const draftAcres = useMemo(() => computeGeodesicAcres(draftPoints), [draftPoints]);
 
-  // Project active parcel GPS beacon & hovered Stress Zone target cleanly in screen space without React re-renders
+  // Project active parcel GPS beacon, Bogue Chitto Gin landmark, & hovered Stress Zone target cleanly
   const updateProjectedOverlays = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -119,6 +132,17 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
       const pt = map.project([p.center.lng, p.center.lat]);
       calloutRef.current.style.transform = `translate3d(${pt.x - 22}px, ${pt.y - 22}px, 0)`;
       calloutRef.current.style.opacity = isDrawingRef.current ? '0' : '1';
+    }
+
+    if (landmarkRef.current) {
+      const lm = regionRef.current.landmark;
+      if (!lm || isDrawingRef.current) {
+        landmarkRef.current.style.opacity = '0';
+      } else {
+        const pt = map.project([lm.lng, lm.lat]);
+        landmarkRef.current.style.transform = `translate3d(${pt.x - 14}px, ${pt.y - 14}px, 0)`;
+        landmarkRef.current.style.opacity = '1';
+      }
     }
 
     if (stressMarkerRef.current) {
@@ -573,7 +597,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
     const closed = [...draftPoints.map((pt) => [pt.lng, pt.lat]), [draftPoints[0].lng, draftPoints[0].lat]];
     onFinishDrawPlot({
       name: draftName.trim(),
-      county: 'Panola County, MS',
+      county: region.countyLabel,
       crop: draftCrop,
       soilSeries: draftSoil,
       irrigationMethod: draftIrrigation,
@@ -628,6 +652,29 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
         </div>
       )}
 
+      {/* Projected Bogue Chitto Gin Landmark Marker (Macon, MS) */}
+      <div
+        ref={landmarkRef}
+        style={{ opacity: 0 }}
+        className="pointer-events-auto fixed left-0 top-0 z-[6] flex items-center gap-2 transition-opacity duration-150"
+      >
+        {region.landmark && (
+          <>
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#e6a84c]/70 bg-[#1a1812]/92 text-[#f0bb66] shadow-[0_0_18px_rgba(230,168,76,0.55)]">
+              <Factory size={14} weight="fill" />
+            </div>
+            <div className="glass-panel-dense rounded-xl border-[#e6a84c]/35 px-2.5 py-1">
+              <div className="whitespace-nowrap text-[11px] font-semibold leading-tight text-[#f6deb2]">
+                {region.landmark.name}
+              </div>
+              <div className="whitespace-nowrap font-mono text-[9.5px] text-[#dce2d4]/68">
+                4762 Deerbrook Rd
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Projected Active Parcel GPS Beacon + Floating Callout Card */}
       <div
         ref={calloutRef}
@@ -666,6 +713,14 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
                   ? `+${selectedParcel.healthDeltaPct}%`
                   : `${selectedParcel.healthDeltaPct}%`}
               </span>
+              {selectedParcel.distanceToLandmarkMiles !== undefined && (
+                <>
+                  <span className="text-white/30">·</span>
+                  <span className="font-mono text-[10px] text-[#f0bb66]">
+                    {selectedParcel.distanceToLandmarkMiles} mi to Gin
+                  </span>
+                </>
+              )}
             </div>
           </div>
           <CaretRight
@@ -739,9 +794,9 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
 
         {/* Active Layer Legend Pill for NDVI / Soil */}
         {activeLayer !== 'satellite' && (
-          <div className="glass-panel mt-0.5 w-[142px] rounded-2xl p-2.5 text-[10px]">
+          <div className="glass-panel mt-0.5 w-[156px] rounded-2xl p-2.5 text-[10px]">
             <div className="font-semibold text-[#f3f5ef]">
-              {activeLayer === 'ndvi' ? 'NDVI Vigor Scale' : 'Panola NRCS Soil'}
+              {activeLayer === 'ndvi' ? 'NDVI Vigor Scale' : region.soilRegionLabel}
             </div>
             {activeLayer === 'ndvi' ? (
               <>
@@ -759,22 +814,15 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
               </>
             ) : (
               <div className="mt-1.5 space-y-1 text-[9.5px] text-[#dce2d4]/75">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[#9bb36e]" />
-                  <span>Memphis Silt Loam</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[#a89a67]" />
-                  <span>Loring Silt Loam</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[#6ca67e]" />
-                  <span>Collins Silt Loam</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[#668f8b]" />
-                  <span>Falaya Silt Loam</span>
-                </div>
+                {region.soilLegend.map((item) => (
+                  <div key={item.name} className="flex items-center gap-1.5">
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="truncate">{item.name}</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -846,7 +894,7 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
             <div className="flex items-center justify-between gap-2">
               <div>
                 <h3 className="text-[14px] font-semibold text-[#d8f274]">
-                  Survey Custom Como, MS Field Plot
+                  Survey Custom {region.id === 'macon' ? 'Macon, MS' : 'Como, MS'} Field Plot
                 </h3>
                 <p className="text-[11.5px] text-[#dce2d4]/68">
                   Click 3+ GPS corners directly on the satellite map ({draftPoints.length} vertices
@@ -898,18 +946,18 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
 
               <div>
                 <label className="mb-1 block text-[10.5px] font-medium text-[#dce2d4]/65">
-                  Panola Soil Series
+                  {region.soilRegionLabel}
                 </label>
                 <select
                   value={draftSoil}
                   onChange={(e) => setDraftSoil(e.target.value)}
                   className="w-full rounded-xl border border-white/12 bg-[#161914] px-3 py-1.5 text-[12px] text-white focus:border-[#d8f274]/60 focus:outline-none"
                 >
-                  <option value="Memphis Silt Loam">Memphis Silt Loam</option>
-                  <option value="Loring Silt Loam">Loring Silt Loam</option>
-                  <option value="Collins Silt Loam">Collins Silt Loam</option>
-                  <option value="Falaya Silt Loam">Falaya Silt Loam</option>
-                  <option value="Grenada Silt Loam">Grenada Silt Loam</option>
+                  {region.soilLegend.map((s) => (
+                    <option key={s.name} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 

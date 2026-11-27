@@ -1,10 +1,20 @@
-# DeltaPlot — Como, Mississippi Farm Management System
+# DeltaPlot — Mississippi Parcel Farm Management System
 
 **Live Deployment:** [https://delta-parcel-fms.vercel.app](https://delta-parcel-fms.vercel.app) · **Repository:** [github.com/sardoru/delta-parcel-fms](https://github.com/sardoru/delta-parcel-fms)
 
-A parcel-first precision agriculture operations cockpit built for **Mississippi farmers**, grounded in **official 2024 Mississippi MARIS cadastral farmland parcels** around **Como, Mississippi (Panola County, FIPS `28107`)** on a live 3D-tilted satellite map.
+A parcel-first precision agriculture operations cockpit built for **Mississippi farmers**, grounded in **official 2024 Mississippi MARIS cadastral farmland parcels** across two major Mississippi row-crop basins on a live 3D-tilted satellite map:
+
+- **Bogue Chitto Gin · Macon, MS (Noxubee County, FIPS `28103`)** — 120 official MARIS 2024 East MS Black Belt Prairie farm parcels (**28,770 surveyed acres / 25,197 cultivated acres**) centered around **Bogue Chitto Gin (`4762 Deerbrook Rd, Macon, MS 39341`)** with live haul-distance telemetry (`mi to Gin`) and Blackland soil series (**Brooksville, Okolona, Leeper, Vaiden, Kipling**).
+- **Como, MS (Panola County, FIPS `28107`)** — 120 official MARIS 2024 West MS cultivated farm parcels (**24,087 surveyed acres / 15,433 cultivated acres**) along Hwy 310, US-51, and I-55 with MLRA-134 loess soil series (**Memphis, Loring, Collins, Falaya, Grenada**).
+
+![DeltaPlot Bogue Chitto Gin — Macon, MS Live Satellite Parcel Dashboard](docs/preview-macon.png)
+
+<details>
+<summary>View Como, MS (Panola County) Basin Screenshot</summary>
 
 ![DeltaPlot Como, MS Live Satellite Parcel Dashboard](docs/preview.png)
+
+</details>
 
 ---
 
