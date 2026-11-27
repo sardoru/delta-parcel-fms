@@ -84,6 +84,9 @@ export interface RawMarisProperties {
   siteadd: string;
   szip: string;
   ownname?: string;
+  mailadd?: string;
+  mailcity?: string;
+  mailzip?: string;
   stateCode?: string;
   gisAcres: number;
   taxAcres: number;
@@ -98,12 +101,107 @@ export interface RawMarisProperties {
   totVal: number;
 }
 
+export type CoverCropOption =
+  | 'None (Stubble / Bare)'
+  | 'Cereal Rye'
+  | 'Crimson Clover'
+  | 'Winter Wheat Cover'
+  | 'Tillage Radish + Oats'
+  | 'Hairy Vetch'
+  | 'Austrian Winter Pea'
+  | 'Black Oats + Clover Mix';
+
+export type TillagePractice = 'No-Till' | 'Strip-Till' | 'Bedded 38"' | 'Conventional';
+
+export interface CropHistoryEntry {
+  id: string;
+  year: number;
+  season: 'Main Crop' | 'Fall/Winter Cover' | 'Double-Crop';
+  crop: string;
+  variety?: string;
+  yieldNote?: string;
+  tillage?: TillagePractice;
+}
+
+export interface ParcelCropProfile {
+  parcelId: string;
+  currentCrop: Parcel['crop'];
+  currentVariety?: string;
+  coverCrop: CoverCropOption;
+  coverCropPlantedDate?: string;
+  coverCropTerminationTarget?: string;
+  previousCrops: CropHistoryEntry[];
+  updatedAt: string;
+}
+
+export type ParcelDocumentCategory =
+  | 'Soil Test'
+  | 'Certification'
+  | 'FSA / USDA Form'
+  | 'Spray / Drone Record'
+  | 'Deed / Tax Roll'
+  | 'Other';
+
+export interface SoilTestMetrics {
+  ph?: number;
+  organicMatterPct?: number;
+  nitrogenLbsAc?: number;
+  phosphorusPpm?: number;
+  potassiumPpm?: number;
+  cec?: number;
+}
+
+export interface ParcelDocument {
+  id: string;
+  parcelId: string;
+  parcelName: string;
+  category: ParcelDocumentCategory;
+  title: string;
+  fileName: string;
+  fileType: string;
+  fileSizeBytes: number;
+  uploadedAt: string;
+  issuerOrLab?: string;
+  expiresAt?: string;
+  status: 'Verified' | 'Active' | 'Pending Review';
+  notes?: string;
+  soilMetrics?: SoilTestMetrics;
+  dataUrl?: string;
+}
+
+export type ParcelClaimStatus = 'unclaimed' | 'postcard_mailed' | 'verified';
+
+export interface ParcelClaimRecord {
+  parcelId: string;
+  parcelName: string;
+  parno: string;
+  county: string;
+  areaAcres: number;
+  crop: string;
+  taxAssessorOwner: string;
+  taxMailingAddress: string;
+  taxAddressSource: 'MARIS Tax Roll Live' | 'County GIS Cadastral' | 'Assessor Parcel Record';
+  farmEntityName: string;
+  claimantName: string;
+  claimantEmail: string;
+  claimantPhone: string;
+  status: Exclude<ParcelClaimStatus, 'unclaimed'>;
+  postcardPin: string;
+  trackingNumber: string;
+  requestedAt: string;
+  estimatedArrivalWindow: string;
+  verifiedAt?: string;
+}
+
+export type ParcelDetailTab = 'overview' | 'crops' | 'documents' | 'claim';
+
 export interface Parcel {
   id: string;
   name: string;
   parno: string;
   fsaTract: string;
   ownerName: string;
+  ownerMailingAddress?: string;
   county: string;
   cityState: string;
   siteAddress: string;

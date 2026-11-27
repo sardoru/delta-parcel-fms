@@ -4,6 +4,7 @@ import {
   CloudSun,
   Drop,
   Factory,
+  HouseLine,
   MagnifyingGlass,
   Plus,
   WarningCircle,
@@ -49,6 +50,9 @@ interface TopHudBarProps {
   isDrawingPlot: boolean;
   onToggleDrawPlot: () => void;
   onOpenCabMode: () => void;
+  claimedCount: number;
+  pendingClaimCount: number;
+  onOpenFarmerPortal: () => void;
 }
 
 export const TopHudBar: React.FC<TopHudBarProps> = ({
@@ -71,6 +75,9 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
   isDrawingPlot,
   onToggleDrawPlot,
   onOpenCabMode,
+  claimedCount,
+  pendingClaimCount,
+  onOpenFarmerPortal,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -392,6 +399,22 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
           )}
         </div>
 
+        {/* Farmer Owner Portal Trigger */}
+        <button
+          type="button"
+          onClick={onOpenFarmerPortal}
+          title="Open your Farmer Owner Portal (claimed parcels, crop covers, soil tests, postcard claims)"
+          className="glass-pill flex h-10 items-center gap-1.5 rounded-full border-[#7cd8a0]/40 px-3 text-[12px] font-semibold text-[#e6f5ea] transition-all hover:border-[#7cd8a0]/75 hover:bg-[#1a241d]/95 active:scale-[0.98]"
+        >
+          <HouseLine size={15} weight="duotone" className="text-[#7cd8a0]" />
+          <span className="hidden xl:inline">My Farm</span>
+          {(claimedCount > 0 || pendingClaimCount > 0) && (
+            <span className="rounded-full bg-[#7cd8a0]/22 px-1.5 py-0.5 font-mono text-[10px] font-bold text-[#9be8b8]">
+              {claimedCount + pendingClaimCount}
+            </span>
+          )}
+        </button>
+
         {/* Drive Combine Harvester Cab Simulator Trigger */}
         <button
           type="button"
@@ -545,7 +568,25 @@ export const TopHudBar: React.FC<TopHudBarProps> = ({
                   <span className="text-[#dce2d4]/50">Loaded Parcels</span>
                   <span className="tabular-nums font-medium">{parcels.length} plots</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-[#dce2d4]/50">Claimed Parcels</span>
+                  <span className="tabular-nums font-medium text-[#7cd8a0]">
+                    {claimedCount} verified
+                    {pendingClaimCount > 0 ? ` · ${pendingClaimCount} pending` : ''}
+                  </span>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setProfileOpen(false);
+                  onOpenFarmerPortal();
+                }}
+                className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-full bg-[#d8f274] px-3 py-1.5 text-[11.5px] font-bold text-[#141710] hover:bg-[#e7fc95]"
+              >
+                <HouseLine size={14} weight="bold" />
+                Open My Farm Portal
+              </button>
             </div>
           )}
         </div>

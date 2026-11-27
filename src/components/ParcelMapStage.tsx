@@ -63,6 +63,8 @@ interface ParcelMapStageProps {
   onToggleFacilities: () => void;
   onToggleFacilityScope: () => void;
   onOpenParcelDetail: () => void;
+  selectedParcelCoverCrop?: string;
+  selectedParcelClaimStatus?: 'unclaimed' | 'postcard_mailed' | 'verified';
   onSyncMarisBounds: (
     bounds: { west: number; south: number; east: number; north: number },
     options?: {
@@ -123,6 +125,8 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
   onToggleFacilities,
   onToggleFacilityScope,
   onOpenParcelDetail,
+  selectedParcelCoverCrop,
+  selectedParcelClaimStatus = 'unclaimed',
   onSyncMarisBounds,
   onFinishDrawPlot,
   onCancelDrawPlot,
@@ -1398,12 +1402,27 @@ export const ParcelMapStage: React.FC<ParcelMapStageProps> = ({
             <Leaf size={14} weight="duotone" />
           </div>
           <div className="min-w-0 pr-0.5">
-            <div className="whitespace-nowrap text-[12.5px] font-semibold leading-tight text-[#f5f7f1]">
-              {selectedParcel.name}
+            <div className="flex items-center gap-1.5">
+              <div className="whitespace-nowrap text-[12.5px] font-semibold leading-tight text-[#f5f7f1]">
+                {selectedParcel.name}
+              </div>
+              {selectedParcelClaimStatus === 'verified' && (
+                <span className="rounded-full bg-[#7cd8a0]/22 px-1.5 py-0.2 text-[9px] font-bold text-[#9be8b8]">
+                  ✓ Owner
+                </span>
+              )}
+              {selectedParcelClaimStatus === 'postcard_mailed' && (
+                <span className="rounded-full bg-[#f0bb66]/22 px-1.5 py-0.2 text-[9px] font-bold text-[#f6deb2]">
+                  PIN Sent
+                </span>
+              )}
             </div>
             {selectedParcel.ownerName && (
-              <div className="max-w-[230px] truncate text-[10px] font-medium text-[#d8f274]/85">
+              <div className="max-w-[235px] truncate text-[10px] font-medium text-[#d8f274]/85">
                 {selectedParcel.ownerName}
+                {selectedParcelCoverCrop && selectedParcelCoverCrop !== 'None (Stubble / Bare)' && (
+                  <span className="text-[#8fd469]"> · {selectedParcelCoverCrop}</span>
+                )}
               </div>
             )}
             <div className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-[10.5px]">

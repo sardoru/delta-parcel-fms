@@ -103,7 +103,7 @@ async function queryMsMaris(bounds: ParcelSyncBounds, layerId: 1 | 2, minAcres: 
     spatialRel: 'esriSpatialRelIntersects',
     where: `CULT_AC1 >= ${minAcres} OR GISACRES >= ${minAcres}`,
     outFields:
-      'PARNO,OWNNAME,TAXMAP,SECTION,TWSP,RANGE,SITEADD,SZIP,TAXACRES,GISACRES,CULT_AC1,CULT_AC2,UNCULT_AC1,LEGLDESC,CNTYNAME,LATDEC,LONGDEC,TAXYEAR,LANDVAL,TOTVAL',
+      'PARNO,OWNNAME,MAILADD1,MCITY1,MZIP1,TAXMAP,SECTION,TWSP,RANGE,SITEADD,SZIP,TAXACRES,GISACRES,CULT_AC1,CULT_AC2,UNCULT_AC1,LEGLDESC,CNTYNAME,LATDEC,LONGDEC,TAXYEAR,LANDVAL,TOTVAL',
     outSR: '4326',
     f: 'geojson',
   });
@@ -128,6 +128,9 @@ async function queryMsMaris(bounds: ParcelSyncBounds, layerId: 1 | 2, minAcres: 
           siteadd: String(p.SITEADD || '').trim(),
           szip: String(p.SZIP || '').trim(),
           ownname: String(p.OWNNAME || '').trim(),
+          mailadd: String(p.MAILADD1 || '').trim(),
+          mailcity: String(p.MCITY1 || '').trim(),
+          mailzip: String(p.MZIP1 || '').trim(),
           stateCode: 'MS',
           gisAcres: Number(gisAcres.toFixed(1)),
           taxAcres: Number(Number(p.TAXACRES || gisAcres).toFixed(1)),

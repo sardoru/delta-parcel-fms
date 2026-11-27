@@ -20,10 +20,23 @@ import {
   LngLat,
   MapLayer,
   Parcel,
+  ParcelClaimRecord,
+  ParcelCropProfile,
+  ParcelDetailTab,
+  ParcelDocument,
   RawMarisProperties,
   RegionId,
   StressCell,
 } from './types/farm';
+import {
+  buildDefaultCropProfile,
+  loadStoredCropProfiles,
+  loadStoredParcelClaims,
+  loadStoredParcelDocuments,
+  saveStoredCropProfiles,
+  saveStoredParcelClaims,
+  saveStoredParcelDocuments,
+} from './data/parcelOwnerStore';
 import {
   compassFromDegrees,
   computeBbox,
@@ -41,6 +54,7 @@ import {
 } from './components/InspectorDrawers';
 import { CombineCabSimulator } from './components/CombineCabSimulator';
 import { DroneMarketplaceModal } from './components/DroneMarketplaceModal';
+import { FarmerPortalModal } from './components/FarmerPortalModal';
 import {
   DRONE_TERRITORIES,
   DroneRfqRecord,
@@ -166,7 +180,29 @@ export function App() {
   const [isDrawingPlot, setIsDrawingPlot] = useState(false);
   const [isSyncingMaris, setIsSyncingMaris] = useState(false);
   const [marisSyncMessage, setMarisSyncMessage] = useState<string | null>(null);
-  const [parcelDetailOpen, setParcelDetailOpen] = useState(false);
+  const [parcelDetailTab, setParcelDetailTab] = useState<ParcelDetailTab | null>(() => {
+    try {
+      const d = new URLSearchParams(window.location.search).get('drawer');
+      if (d === 'overview' || d === 'crops' || d === 'documents' || d === 'claim') return d;
+    } catch {}
+    return null;
+  });
+  const [farmerPortalOpen, setFarmerPortalOpen] = useState<boolean>(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('mode') === 'portal';
+    } catch {
+      return false;
+    }
+  });
+  const [cropProfiles, setCropProfiles] = useState<Record<string, ParcelCropProfile>>(() =>
+    loadStoredCropProfiles()
+  );
+  const [parcelDocuments, setParcelDocuments] = useState<ParcelDocument[]>(() =>
+    loadStoredParcelDocuments()
+  );
+  const [parcelClaims, setParcelClaims] = useState<Record<string, ParcelClaimRecord>>(() =>
+    loadStoredParcelClaims()
+  );
   const [aiInsightsOpen, setAiInsightsOpen] = useState(false);
   const [inspectedEquipmentId, setInspectedEquipmentId] = useState<string | null>(null);
   const [cabModeOpen, setCabModeOpen] = useState<boolean>(() => {
@@ -462,6 +498,101 @@ export function App() {
     );
   };
 
+  const handleUpdateCropProfile = (parcelId: string, nextProfile: ParcelCropProfile) => {
+    setCropProfiles((prev) => {
+      const next = { ...prev, [parcelId]: nextProfile };
+      saveStoredCropProfiles(next);
+      return next;
+    });
+    updateParcels((prev) =>
+      prev.map((p) => (p.id === parcelId ? { ...p, crop: nextProfile.currentCrop } : p))
+    );
+  };
+
+  const handleUploadDocument = (doc: ParcelDocument) => {
+    setParcelDocuments((prev) => {
+      const next = [doc, ...prev];
+      saveStoredParcelDocuments(next);
+      return next;
+    });
+    handleAddLog(doc.parcelId, {
+      date: doc.uploadedAt,
+      category: doc.category === 'Soil Test' ? 'Soil Sample' : 'Scouting',
+      title: `Uploaded ${doc.category}: ${doc.title}`,
+      operator: 'Farm Owner Vault',
+      detail: `${doc.fileName}${doc.issuerOrLab ? ` (${doc.issuerOrLab})` : ''}${
+        doc.soilMetrics?.ph ? ` · Lab pH ${doc.soilMetrics.ph}` : ''
+      }.`,
+    });
+  };
+
+  const handleDeleteDocument = (docId: string) => {
+    setParcelDocuments((prev) => {
+      const next = prev.filter((d) => d.id !== docId);
+      saveStoredParcelDocuments(next);
+      return next;
+    });
+  };
+
+  const handleRequestClaimPostcard = (claim: ParcelClaimRecord) => {
+    setParcelClaims((prev) => {
+      const next = { ...prev, [claim.parcelId]: claim };
+      saveStoredParcelClaims(next);
+      return next;
+    });
+    handleAddLog(claim.parcelId, {
+      date: claim.requestedAt,
+      category: 'Scouting',
+      title: `Ownership Verification Postcard Requested (${claim.trackingNumber})`,
+      operator: claim.claimantName,
+      detail: `USPS verification PIN mailed to Tax Assessor roll address: ${claim.taxMailingAddress}. ETA ${claim.estimatedArrivalWindow}.`,
+    });
+  };
+
+  const handleVerifyClaimPin = (parcelId: string, pinInput: string): boolean => {
+    const existing = parcelClaims[parcelId];
+    if (!existing) return false;
+    const normalizedInput = pinInput.replace(/\D/g, '');
+    const normalizedActual = existing.postcardPin.replace(/\D/g, '');
+    if (normalizedInput.length !== 6 || normalizedInput !== normalizedActual) {
+      return false;
+    }
+    const verifiedAt = new Date().toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    setParcelClaims((prev) => {
+      const next: Record<string, ParcelClaimRecord> = {
+        ...prev,
+        [parcelId]: { ...existing, status: 'verified', verifiedAt },
+      };
+      saveStoredParcelClaims(next);
+      return next;
+    });
+    handleAddLog(parcelId, {
+      date: verifiedAt,
+      category: 'Scouting',
+      title: `Parcel Ownership Verified · ${existing.farmEntityName}`,
+      operator: existing.claimantName,
+      detail: `Verified via USPS Tax Roll Postcard PIN (${existing.trackingNumber}). Added to Farmer Owner Portal.`,
+    });
+    return true;
+  };
+
+  const activeCropProfile = useMemo(() => {
+    if (!selectedParcel) return null;
+    return cropProfiles[selectedParcel.id] || buildDefaultCropProfile(selectedParcel);
+  }, [selectedParcel, cropProfiles]);
+
+  const claimedCounts = useMemo(() => {
+    const vals = Object.values(parcelClaims);
+    return {
+      verified: vals.filter((c) => c.status === 'verified').length,
+      pending: vals.filter((c) => c.status === 'postcard_mailed').length,
+    };
+  }, [parcelClaims]);
+
   const handleFinishDrawPlot = (payload: {
     name: string;
     county: string;
@@ -635,7 +766,9 @@ export function App() {
         onChangeLidarOverlayStyle={setLidarOverlayStyle}
         onToggleFacilities={() => setShowFacilities((v) => !v)}
         onToggleFacilityScope={() => setFacilityScope((s) => (s === 'usa' ? 'ms' : 'usa'))}
-        onOpenParcelDetail={() => setParcelDetailOpen(true)}
+        onOpenParcelDetail={() => setParcelDetailTab('overview')}
+        selectedParcelCoverCrop={activeCropProfile?.coverCrop}
+        selectedParcelClaimStatus={parcelClaims[selectedParcel.id]?.status ?? 'unclaimed'}
         onSyncMarisBounds={handleSyncMarisBounds}
         onFinishDrawPlot={handleFinishDrawPlot}
         onCancelDrawPlot={() => setIsDrawingPlot(false)}
@@ -652,11 +785,14 @@ export function App() {
             hoveredStressCell={hoveredStressCell}
             onHoverStressCell={setHoveredStressCell}
             onOpenAIInsights={() => setAiInsightsOpen(true)}
-            onOpenParcelDetail={() => setParcelDetailOpen(true)}
+            onOpenParcelDetail={(tab = 'overview') => setParcelDetailTab(tab)}
             showUsgsWaterOverlay={showUsgsWaterOverlay}
             showLidarOverlay={showLidarOverlay}
             onToggleUsgsWaterOverlay={() => setShowUsgsWaterOverlay((v) => !v)}
             onToggleLidarOverlay={() => setShowLidarOverlay((v) => !v)}
+            activeCropProfile={activeCropProfile!}
+            parcelDocCount={parcelDocuments.filter((d) => d.parcelId === selectedParcel.id).length}
+            claimStatus={parcelClaims[selectedParcel.id]?.status ?? 'unclaimed'}
           />
         </div>
 
@@ -709,6 +845,9 @@ export function App() {
               setIsDrawingPlot(false);
               setCabModeOpen(true);
             }}
+            claimedCount={claimedCounts.verified}
+            pendingClaimCount={claimedCounts.pending}
+            onOpenFarmerPortal={() => setFarmerPortalOpen(true)}
           />
 
           {/* Compact Parcel Switcher Strip on small screens */}
@@ -751,7 +890,7 @@ export function App() {
               onToggleEquipmentStatus={handleToggleEquipmentStatus}
               onAdjustEquipmentSpeed={handleAdjustEquipmentSpeed}
               onAdjustIrrigationZone={handleAdjustIrrigationZone}
-              onOpenParcelDetail={() => setParcelDetailOpen(true)}
+              onOpenParcelDetail={() => setParcelDetailTab('overview')}
               onOpenCabMode={() => {
                 setIsDrawingPlot(false);
                 setCabModeOpen(true);
@@ -762,12 +901,65 @@ export function App() {
       </div>
 
       {/* Drawers & Modals */}
-      {parcelDetailOpen && (
+      {parcelDetailTab && activeCropProfile && (
         <ParcelDetailDrawer
           parcel={selectedParcel}
           unit={unit}
-          onClose={() => setParcelDetailOpen(false)}
+          initialTab={parcelDetailTab}
+          cropProfile={activeCropProfile}
+          documents={parcelDocuments}
+          claimRecord={parcelClaims[selectedParcel.id]}
+          onClose={() => setParcelDetailTab(null)}
           onAddLog={handleAddLog}
+          onUpdateCropProfile={handleUpdateCropProfile}
+          onUploadDocument={handleUploadDocument}
+          onDeleteDocument={handleDeleteDocument}
+          onRequestClaimPostcard={handleRequestClaimPostcard}
+          onVerifyClaimPin={handleVerifyClaimPin}
+          onOpenFarmerPortal={() => {
+            setParcelDetailTab(null);
+            setFarmerPortalOpen(true);
+          }}
+        />
+      )}
+
+      {/* Farmer Owner Portal & Farm Management System Dashboard */}
+      {farmerPortalOpen && (
+        <FarmerPortalModal
+          parcels={parcels}
+          unit={unit}
+          cropProfiles={cropProfiles}
+          documents={parcelDocuments}
+          claims={parcelClaims}
+          droneRfqs={droneRfqs}
+          authIssueUrl="https://github.com/sardoru/delta-parcel-fms/issues/1"
+          onClose={() => setFarmerPortalOpen(false)}
+          onFocusParcelOnMap={(pid) => {
+            setSelectedParcelId(pid);
+            setFarmerPortalOpen(false);
+          }}
+          onOpenParcelDrawer={(pid, tab) => {
+            setSelectedParcelId(pid);
+            setFarmerPortalOpen(false);
+            setParcelDetailTab(tab);
+          }}
+          onUpdateCropProfile={handleUpdateCropProfile}
+          onUploadDocument={handleUploadDocument}
+          onDeleteDocument={handleDeleteDocument}
+          onVerifyClaimPin={handleVerifyClaimPin}
+          onOpenDroneRfqForParcels={(pids) => {
+            if (pids.length > 0) {
+              setSelectedParcelId(pids[0]);
+              setMultiSelectedParcelIds(pids);
+            }
+            setFarmerPortalOpen(false);
+            setDroneModalTab('rfq');
+          }}
+          onOpenCabForParcel={(pid) => {
+            setSelectedParcelId(pid);
+            setFarmerPortalOpen(false);
+            setCabModeOpen(true);
+          }}
         />
       )}
 

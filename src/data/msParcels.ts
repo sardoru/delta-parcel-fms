@@ -471,12 +471,20 @@ export function hydrateMarisFeature(
       ? haversineMiles(p.lat, p.lng, cfg.landmark.lat, cfg.landmark.lng)
       : undefined;
 
+  const ownerMailingAddress = [
+    p.mailadd?.trim(),
+    [p.mailcity?.trim(), p.mailzip?.trim()].filter(Boolean).join(' '),
+  ]
+    .filter(Boolean)
+    .join(', ');
+
   return {
     id: `${stateCode === 'MS' ? regionId : stateCode.toLowerCase()}-${p.parno.replace(/\s+/g, '-')}`,
     name,
     parno: p.parno,
     fsaTract: `PARNO ${p.parno}`,
     ownerName,
+    ownerMailingAddress: ownerMailingAddress || undefined,
     county: `${countyClean} County, ${stateCode}`,
     cityState: cityLabel,
     siteAddress: cleanSite,

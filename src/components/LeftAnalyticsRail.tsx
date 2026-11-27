@@ -4,13 +4,26 @@ import {
   CaretDown,
   Cube,
   Drop,
+  EnvelopeSimple,
+  FileText,
+  Plant,
+  SealCheck,
+  ShieldCheck,
   Sparkle,
   Thermometer,
   TrendUp,
   TrendDown,
   Waves,
 } from '@phosphor-icons/react';
-import { AreaUnit, Parcel, StressCell, TimeframeKey } from '../types/farm';
+import {
+  AreaUnit,
+  Parcel,
+  ParcelClaimStatus,
+  ParcelCropProfile,
+  ParcelDetailTab,
+  StressCell,
+  TimeframeKey,
+} from '../types/farm';
 import {
   fetchParcelWaterAndLidar,
   ParcelWaterAndLidarData,
@@ -24,11 +37,14 @@ interface LeftAnalyticsRailProps {
   hoveredStressCell: StressCell | null;
   onHoverStressCell: (cell: StressCell | null) => void;
   onOpenAIInsights: () => void;
-  onOpenParcelDetail: () => void;
+  onOpenParcelDetail: (tab?: ParcelDetailTab) => void;
   showUsgsWaterOverlay: boolean;
   showLidarOverlay: boolean;
   onToggleUsgsWaterOverlay: () => void;
   onToggleLidarOverlay: () => void;
+  activeCropProfile: ParcelCropProfile;
+  parcelDocCount: number;
+  claimStatus: ParcelClaimStatus;
 }
 
 const SNAPSHOT_DATES = ['November 26', 'November 19', 'November 12'] as const;
@@ -76,6 +92,9 @@ export const LeftAnalyticsRail: React.FC<LeftAnalyticsRailProps> = ({
   showLidarOverlay,
   onToggleUsgsWaterOverlay,
   onToggleLidarOverlay,
+  activeCropProfile,
+  parcelDocCount,
+  claimStatus,
 }) => {
   const [scope, setScope] = useState<'parcel' | 'farm'>('parcel');
   const [timeframe, setTimeframe] = useState<TimeframeKey>('7d');
@@ -288,7 +307,7 @@ export const LeftAnalyticsRail: React.FC<LeftAnalyticsRailProps> = ({
         <div className="mb-1 flex items-center justify-between gap-2">
           <button
             type="button"
-            onClick={onOpenParcelDetail}
+            onClick={() => onOpenParcelDetail('overview')}
             className="min-w-0 flex-1 truncate text-left text-[12px] font-medium text-[#dce2d4]/80 transition-colors hover:text-[#d8f274]"
             title="Inspect full cadastral parcel dossier & ownership"
           >
@@ -321,11 +340,48 @@ export const LeftAnalyticsRail: React.FC<LeftAnalyticsRailProps> = ({
         </div>
 
         {scope === 'parcel' && selectedParcel.ownerName && (
-          <div className="mb-1 flex items-center justify-between gap-2 rounded-lg bg-white/[0.035] px-2 py-1 text-[10.5px]">
-            <span className="shrink-0 text-[#dce2d4]/48">Owner</span>
-            <span className="truncate font-medium text-[#d8f274]" title={selectedParcel.ownerName}>
-              {selectedParcel.ownerName}
-            </span>
+          <div className="mb-1 flex items-center justify-between gap-1.5 rounded-lg bg-white/[0.035] px-2 py-1 text-[10.5px]">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="shrink-0 text-[#dce2d4]/48">Owner</span>
+              <span className="truncate font-medium text-[#d8f274]" title={selectedParcel.ownerName}>
+                {selectedParcel.ownerName}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpenParcelDetail('claim')}
+              className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[9.5px] font-semibold transition-colors ${
+                claimStatus === 'verified'
+                  ? 'bg-[#7cd8a0]/20 text-[#9be8b8]'
+                  : claimStatus === 'postcard_mailed'
+                  ? 'bg-[#f0bb66]/20 text-[#f6deb2]'
+                  : 'border border-[#d8f274]/35 bg-[#d8f274]/12 text-[#d8f274] hover:bg-[#d8f274] hover:text-[#141710]'
+              }`}
+              title={
+                claimStatus === 'verified'
+                  ? 'Verified owner — view certificate'
+                  : claimStatus === 'postcard_mailed'
+                  ? 'Postcard mailed — enter 6-digit PIN'
+                  : 'Claim this parcel via Tax Assessor postcard PIN'
+              }
+            >
+              {claimStatus === 'verified' ? (
+                <>
+                  <SealCheck size={10} weight="fill" />
+                  Verified
+                </>
+              ) : claimStatus === 'postcard_mailed' ? (
+                <>
+                  <EnvelopeSimple size={10} weight="fill" />
+                  PIN Sent
+                </>
+              ) : (
+                <>
+                  <ShieldCheck size={10} />
+                  Claim
+                </>
+              )}
+            </button>
           </div>
         )}
 
@@ -376,6 +432,34 @@ export const LeftAnalyticsRail: React.FC<LeftAnalyticsRailProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Compact Parcel Crop Cover & Vault Quick Strip */}
+        {scope === 'parcel' && (
+          <div className="mt-2.5 flex items-center gap-1.5 border-t border-white/8 pt-2">
+            <button
+              type="button"
+              onClick={() => onOpenParcelDetail('crops')}
+              className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-white/8 bg-white/[0.03] px-2 py-1 text-left text-[10px] text-[#dce2d4]/85 transition-colors hover:border-[#8fd469]/45 hover:text-white"
+              title="Edit parcel cover crop & previous crops planted"
+            >
+              <Plant size={12} className="shrink-0 text-[#8fd469]" />
+              <span className="truncate">
+                {activeCropProfile.coverCrop === 'None (Stubble / Bare)'
+                  ? 'Add Cover / Crops'
+                  : `Cover: ${activeCropProfile.coverCrop}`}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenParcelDetail('documents')}
+              className="flex shrink-0 items-center gap-1 rounded-lg border border-white/8 bg-white/[0.03] px-2 py-1 text-[10px] text-[#8edcf5] transition-colors hover:border-[#5ec8eb]/45 hover:bg-[#5ec8eb]/10"
+              title="Upload soil tests, certifications, and parcel documents"
+            >
+              <FileText size={12} />
+              <span>Docs{parcelDocCount > 0 ? ` (${parcelDocCount})` : ''}</span>
+            </button>
+          </div>
+        )}
       </section>
 
       {/* CARD 2: Health Trend */}
