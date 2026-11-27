@@ -1,5 +1,7 @@
 # DeltaPlot — Como, Mississippi Farm Management System
 
+**Live Deployment:** [https://delta-parcel-fms.vercel.app](https://delta-parcel-fms.vercel.app) · **Repository:** [github.com/sardoru/delta-parcel-fms](https://github.com/sardoru/delta-parcel-fms)
+
 A parcel-first precision agriculture operations cockpit built for **Mississippi farmers**, grounded in **official 2024 Mississippi MARIS cadastral farmland parcels** around **Como, Mississippi (Panola County, FIPS `28107`)** on a live 3D-tilted satellite map.
 
 ![DeltaPlot Como, MS Live Satellite Parcel Dashboard](docs/preview.png)
@@ -101,7 +103,7 @@ delta-parcel-fms/
 
 ### Run Locally
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/sardoru/delta-parcel-fms.git
 cd delta-parcel-fms
 npm install
 npm run dev
